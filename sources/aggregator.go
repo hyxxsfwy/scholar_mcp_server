@@ -1,4 +1,4 @@
-package aggregator
+package sources
 
 import (
 	"context"
@@ -10,30 +10,29 @@ import (
 	"time"
 
 	"github.com/Seelly/scholar_mcp_server/common"
-	
 )
 
 // ScholarAggregator 学术论文聚合器
 type ScholarAggregator struct {
-	sourceManager *sources.SourceManager
+	sourceManager *SourceManager
 }
 
 // NewScholarAggregator 创建新的聚合器
 func NewScholarAggregator() *ScholarAggregator {
 	return &ScholarAggregator{
-		sourceManager: sources.GetDefaultSourceManager(),
+		sourceManager: GetDefaultSourceManager(),
 	}
 }
 
 // NewScholarAggregatorWithManager 使用指定的数据源管理器创建聚合器
-func NewScholarAggregatorWithManager(manager *sources.SourceManager) *ScholarAggregator {
+func NewScholarAggregatorWithManager(manager *SourceManager) *ScholarAggregator {
 	return &ScholarAggregator{
 		sourceManager: manager,
 	}
 }
 
-// SearchResult 聚合搜索结果
-type SearchResult struct {
+// AggregatedSearchResult 聚合搜索结果
+type AggregatedSearchResult struct {
 	Query         string                 `json:"query"`
 	TotalSources  int                    `json:"total_sources"`
 	ActiveSources int                    `json:"active_sources"`
@@ -46,7 +45,7 @@ type SearchResult struct {
 }
 
 // SearchPapers 聚合搜索论文
-func (a *ScholarAggregator) SearchPapers(ctx context.Context, params common.SearchParams) (*SearchResult, error) {
+func (a *ScholarAggregator) SearchPapers(ctx context.Context, params common.SearchParams) (*AggregatedSearchResult, error) {
 	startTime := time.Now()
 
 	// 验证参数
@@ -68,7 +67,7 @@ func (a *ScholarAggregator) SearchPapers(ctx context.Context, params common.Sear
 		elapsed time.Duration
 	}
 
-	resultChan := make(chan sourceResult, 6)
+	resultChan := make(chan sourceResult, 10) // 增加缓冲区大小
 	var wg sync.WaitGroup
 	totalSources := 0
 	activeSources := 0
@@ -79,7 +78,7 @@ func (a *ScholarAggregator) SearchPapers(ctx context.Context, params common.Sear
 
 	for sourceName, source := range enabledSources {
 		wg.Add(1)
-		go func(name string, src sources.PaperSource) {
+		go func(name string, src PaperSource) {
 			defer wg.Done()
 			start := time.Now()
 			papers, total, err := src.SearchPapers(ctx, params)
@@ -158,7 +157,7 @@ func (a *ScholarAggregator) SearchPapers(ctx context.Context, params common.Sear
 	log.Printf("[INFO] 聚合搜索完成: %d个数据源, %d个活跃, %d篇论文, 耗时%v",
 		totalSources, activeSources, len(mergedPapers), searchTime)
 
-	return &SearchResult{
+	return &AggregatedSearchResult{
 		Query:         params.Query,
 		TotalSources:  totalSources,
 		ActiveSources: activeSources,

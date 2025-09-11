@@ -89,11 +89,11 @@ func (c *ArxivClient) SearchPapers(ctx context.Context, query string, start, max
 
 	// 转换为我们的数据结构
 	result := &SearchResult{
-		Query:       query,
-		Start:       start,
-		MaxResults:  maxResults,
-		TotalCount:  feed.TotalResults,
-		Papers:      make([]Paper, len(feed.Entries)),
+		Query:      query,
+		Start:      start,
+		MaxResults: maxResults,
+		TotalCount: feed.TotalResults,
+		Papers:     make([]Paper, len(feed.Entries)),
 	}
 
 	for i, entry := range feed.Entries {
@@ -202,17 +202,17 @@ func convertEntryToPaper(entry Entry) Paper {
 	}
 
 	return Paper{
-		ID:            arxivID,
-		Title:         strings.TrimSpace(entry.Title),
-		Authors:       authors,
-		Abstract:      strings.TrimSpace(entry.Summary),
-		Categories:    categories,
-		Published:     publishedDate,
-		Updated:       updatedDate,
-		URL:           entry.ID,
-		PDFURL:        pdfURL,
-		DOI:           entry.DOI,
-		JournalRef:    entry.JournalRef,
-		Comment:       entry.Comment,
+		ID:         arxivID,
+		Title:      strings.TrimSpace(entry.Title),
+		Authors:    authors,
+		Abstract:   strings.TrimSpace(entry.Summary),
+		Categories: categories,
+		Published:  publishedDate,
+		Updated:    updatedDate,
+		URL:        entry.ID,
+		PDFURL:     pdfURL,
+		DOI:        entry.DOI,
+		JournalRef: entry.JournalRef,
+		Comment:    entry.Comment,
 	}
 }

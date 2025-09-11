@@ -352,19 +352,19 @@ func convertAbstractRetrievalToPaper(data AbstractRetrievalData) Paper {
 	}
 
 	return Paper{
-		EID:              data.CoreData.EID,
-		DOI:              data.CoreData.DOI,
-		URL:              scopusURL,
-		Title:            data.CoreData.Title,
-		Abstract:         abstract,
-		PublicationName:  data.CoreData.PublicationName,
-		CoverDate:        data.CoreData.CoverDate,
-		Publisher:        data.CoreData.Publisher,
-		AggregationType:  data.CoreData.AggregationType,
+		EID:                data.CoreData.EID,
+		DOI:                data.CoreData.DOI,
+		URL:                scopusURL,
+		Title:              data.CoreData.Title,
+		Abstract:           abstract,
+		PublicationName:    data.CoreData.PublicationName,
+		CoverDate:          data.CoreData.CoverDate,
+		Publisher:          data.CoreData.Publisher,
+		AggregationType:    data.CoreData.AggregationType,
 		SubtypeDescription: data.CoreData.SubtypeDescription,
-		CitedByCount:     citedByCount,
-		Author:           data.Authors.Author,
-		Affiliation:      data.Affiliation,
-		SubjectAreas:     data.SubjectAreas.SubjectArea,
+		CitedByCount:       citedByCount,
+		Author:             data.Authors.Author,
+		Affiliation:        data.Affiliation,
+		SubjectAreas:       data.SubjectAreas.SubjectArea,
 	}
 }

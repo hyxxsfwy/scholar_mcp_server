@@ -2,7 +2,6 @@ package scihub
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,10 +21,10 @@ const (
 
 // SciHubClient Sci-Hub客户端
 type SciHubClient struct {
-	client      *http.Client
-	mirrors     []string
+	client        *http.Client
+	mirrors       []string
 	currentMirror string
-	userAgent   string
+	userAgent     string
 }
 
 // NewSciHubClient 创建新的Sci-Hub客户端
@@ -70,7 +69,7 @@ func (c *SciHubClient) SearchPapers(ctx context.Context, query string, maxResult
 
 	// Sci-Hub不支持传统搜索，我们尝试将查询作为DOI或标题处理
 	papers := []Paper{}
-	
+
 	// 如果查询看起来像DOI，直接尝试获取
 	if isDOI(query) {
 		if paper, err := c.GetPaper(ctx, query); err == nil {
@@ -205,7 +204,7 @@ func (c *SciHubClient) GetPDFURL(ctx context.Context, identifier string) (*PDFRe
 // CheckAvailability 检查论文是否可用
 func (c *SciHubClient) CheckAvailability(ctx context.Context, doi string) (*AvailabilityCheck, error) {
 	paper, err := c.GetPaper(ctx, doi)
-	
+
 	result := &AvailabilityCheck{
 		DOI:       doi,
 		Available: false,
@@ -253,7 +252,7 @@ func (c *SciHubClient) GetMirrorStatus(ctx context.Context) (*MirrorStatus, erro
 
 	for _, mirrorURL := range c.mirrors {
 		status := "unknown"
-		
+
 		// 简单的连通性检查
 		if err := c.checkMirrorConnectivity(ctx, mirrorURL); err == nil {
 			status = "active"
@@ -285,7 +284,7 @@ func (c *SciHubClient) checkMirrorConnectivity(ctx context.Context, mirrorURL st
 	}
 
 	req.Header.Set("User-Agent", c.userAgent)
-	
+
 	resp, err := c.client.Do(req)
 	if err != nil {
 		return err

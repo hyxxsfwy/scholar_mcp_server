@@ -1,205 +1,170 @@
+// package main
+//
+// import (
+//
+//	"log"
+//	"net/http"
+//
+//	"github.com/modelcontextprotocol/go-sdk/mcp"
+//	"github.com/Seelly/scholar_mcp_server/sources"
+//
+// )
+//
+//	func main() {
+//		log.Printf("[INFO] ========== 学术论文检索聚合MCP服务器启动 ==========")
+//		log.Printf("[INFO] 正在初始化统一学术论文检索MCP服务器...")
+//
+//		server := mcp.NewServer(&mcp.Implementation{
+//			Name:    "scholar-aggregator-mcp-server",
+//			Version: "2.0.0",
+//		}, nil)
+//		log.Printf("[DEBUG] MCP服务器创建完成，名称: %s, 版本: %s", "scholar-aggregator-mcp-server", "2.0.0")
+//
+//		// 创建统一MCP处理器
+//		mcpHandler := sources.NewUnifiedMCPHandler()
+//
+//		// 添加统一的学术论文搜索工具
+//		log.Printf("[DEBUG] 正在注册统一学术论文搜索工具...")
+//		mcp.AddTool(server, &mcp.Tool{
+//			Name:        "searchScholarPapers",
+//			Description: "Search academic papers from multiple sources simultaneously (arXiv, Semantic Scholar, Crossref, Scopus, ADSABS, Sci-Hub). Automatically aggregates, deduplicates, and ranks results. Supports advanced filtering by author, journal, year, citations, and open access status. Returns unified paper metadata with source attribution.",
+//		}, mcpHandler.SearchScholarPapers)
+//		log.Printf("[INFO] 统一学术论文搜索工具注册完成")
+//
+//		// 添加获取学术论文详情工具
+//		log.Printf("[DEBUG] 正在注册学术论文详情获取工具...")
+//		mcp.AddTool(server, &mcp.Tool{
+//			Name:        "getScholarPaper",
+//			Description: "Get detailed information of a specific academic paper by any identifier (DOI, arXiv ID, PubMed ID, Semantic Scholar ID, etc.). Automatically determines the best data source based on identifier type and retrieves comprehensive metadata including citations, abstracts, and external links.",
+//		}, mcpHandler.GetScholarPaper)
+//		log.Printf("[INFO] 学术论文详情获取工具注册完成")
+//
+//		// 添加单个数据源搜索工具
+//		log.Printf("[DEBUG] 正在注册单个数据源搜索工具...")
+//		mcp.AddTool(server, &mcp.Tool{
+//			Name:        "searchSourcePapers",
+//			Description: "Search academic papers from a specific data source. Allows targeting individual databases like arXiv, Semantic Scholar, Crossref, etc. Useful when you need results from a particular source or want to compare results across different databases.",
+//		}, mcpHandler.SearchSourcePapers)
+//		log.Printf("[INFO] 单个数据源搜索工具注册完成")
+//
+//		// 添加从单个数据源获取论文详情工具
+//		log.Printf("[DEBUG] 正在注册单个数据源论文详情获取工具...")
+//		mcp.AddTool(server, &mcp.Tool{
+//			Name:        "getSourcePaper",
+//			Description: "Get detailed information of a specific academic paper from a particular data source. Allows fetching paper details from a specific database when you know which source contains the paper or want to compare information across sources.",
+//		}, mcpHandler.GetSourcePaper)
+//		log.Printf("[INFO] 单个数据源论文详情获取工具注册完成")
+//
+//		// 添加数据源列表工具
+//		log.Printf("[DEBUG] 正在注册数据源列表工具...")
+//		mcp.AddTool(server, &mcp.Tool{
+//			Name:        "listAvailableSources",
+//			Description: "List all available academic paper data sources with their current status, capabilities, and configuration. Shows which sources are enabled, available, and their specific features like PDF support, citation data, API requirements, etc.",
+//		}, mcpHandler.ListAvailableSources)
+//		log.Printf("[INFO] 数据源列表工具注册完成")
+//
+//		// Create the streamable HTTP handler.
+//		log.Printf("[DEBUG] 正在创建HTTP处理程序...")
+//		handler := mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
+//			log.Printf("[DEBUG] HTTP请求处理: %s %s", req.Method, req.URL.Path)
+//			return server
+//		}, nil)
+//		log.Printf("[INFO] HTTP处理程序创建完成")
+//
+//		handlerWithLogging := loggingHandler(handler)
+//		log.Printf("[DEBUG] 日志中间件已附加")
+//
+//		url := "http://127.0.0.1:8080/"
+//		log.Printf("[INFO] 学术论文检索聚合MCP服务器正在监听: %s", url)
+//		log.Printf("[INFO] ")
+//		log.Printf("[INFO] 🎯 统一工具接口:")
+//		log.Printf("[INFO]   📚 searchScholarPapers - 聚合搜索学术论文")
+//		log.Printf("[INFO]     ✨ 自动调用多个数据源 (arXiv, Semantic Scholar, Crossref等)")
+//		log.Printf("[INFO]     ✨ 智能去重和结果合并")
+//		log.Printf("[INFO]     ✨ 支持高级过滤和排序")
+//		log.Printf("[INFO]   📄 getScholarPaper - 获取论文详情")
+//		log.Printf("[INFO]     ✨ 支持多种标识符 (DOI, arXiv ID, PubMed ID等)")
+//		log.Printf("[INFO]     ✨ 智能选择最佳数据源")
+//		log.Printf("[INFO] ")
+//		log.Printf("[INFO] 🎯 单独数据源接口:")
+//		log.Printf("[INFO]   🔍 searchSourcePapers - 单个数据源搜索")
+//		log.Printf("[INFO]     ✨ 指定特定数据源进行搜索")
+//		log.Printf("[INFO]     ✨ 适用于对比不同数据源结果")
+//		log.Printf("[INFO]   📋 getSourcePaper - 单个数据源获取论文详情")
+//		log.Printf("[INFO]     ✨ 从指定数据源获取详细信息")
+//		log.Printf("[INFO]     ✨ 便于对比不同源的数据")
+//		log.Printf("[INFO]   📊 listAvailableSources - 列出可用数据源")
+//		log.Printf("[INFO]     ✨ 查看所有数据源状态和能力")
+//		log.Printf("[INFO]     ✨ 了解各源的特性和要求")
+//		log.Printf("[INFO] ")
+//		log.Printf("[INFO] 🔧 支持的数据源:")
+//		log.Printf("[INFO]   📚 arXiv - 物理学、数学、计算机科学预印本")
+//		log.Printf("[INFO]   🧠 Semantic Scholar - AI驱动的学术搜索")
+//		log.Printf("[INFO]   🔗 Crossref - DOI注册机构，广泛的期刊覆盖")
+//		log.Printf("[INFO]   📊 Scopus - Elsevier学术数据库 (需要API密钥)")
+//		log.Printf("[INFO]   🌌 ADSABS - 天体物理学文献 (需要API密钥)")
+//		log.Printf("[INFO]   📄 Sci-Hub - 论文PDF获取")
+//		log.Printf("[INFO] ")
+//		log.Printf("[INFO] 🔑 环境变量配置 (可选):")
+//		log.Printf("[INFO]   - SCOPUS_API_KEY: Scopus API密钥")
+//		log.Printf("[INFO]   - ADSABS_API_KEY: ADSABS API密钥")
+//		log.Printf("[INFO]   - CROSSREF_EMAIL: Crossref礼貌邮箱")
+//		log.Printf("[INFO]   - SEMANTIC_SCHOLAR_API_KEY: Semantic Scholar API密钥")
+//		log.Printf("[INFO] ")
+//		log.Printf("[INFO] 💡 使用示例:")
+//		log.Printf("[INFO]   统一搜索: {\"query\": \"machine learning\"}")
+//		log.Printf("[INFO]   指定数据源: {\"source\": \"arxiv\", \"query\": \"quantum computing\"}")
+//		log.Printf("[INFO]   高级搜索: {\"query\": \"deep learning\", \"author\": \"Hinton\", \"year\": \"2020-2023\"}")
+//		log.Printf("[INFO]   DOI查询: {\"identifier\": \"10.1038/nature12373\"}")
+//		log.Printf("[INFO]   数据源状态: {} (空参数)")
+//
+//		// Start the HTTP server with logging handler.
+//		log.Printf("[INFO] ========== 服务器启动完成，等待连接 ==========")
+//		if err := http.ListenAndServe(":8080", handlerWithLogging); err != nil {
+//			log.Printf("[FATAL] 服务器启动失败: %v", err)
+//			log.Fatalf("Server failed: %v", err)
+//		}
+//	}
 package main
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"log"
-	"github.com/Seelly/scholar_mcp_server/arxiv"
-	"github.com/Seelly/scholar_mcp_server/semanticscholar"
-	"github.com/Seelly/scholar_mcp_server/crossref"
-	"github.com/Seelly/scholar_mcp_server/scopus"
-	"github.com/Seelly/scholar_mcp_server/adsabs"
-	"github.com/Seelly/scholar_mcp_server/scihub"
-	"github.com/Seelly/scholar_mcp_server/common"
 	"net/http"
-	"os"
 	"strings"
-	"sync"
-	"time"
+
+	"github.com/Seelly/scholar_mcp_server/aggregator"
+	"github.com/Seelly/scholar_mcp_server/common"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// arXiv搜索功能
-func searchArxivPapers(ctx context.Context, req *mcp.CallToolRequest, params *arxiv.ArxivSearchParam) (*mcp.CallToolResult, any, error) {
-	log.Printf("[DEBUG] ========== 开始搜索arXiv论文 ==========")
-	log.Printf("[DEBUG] 接收到的原始参数: %+v", params)
-
-	// 设置默认值
-	if params.Start < 0 {
-		params.Start = 0
-	}
-	if params.MaxResults <= 0 {
-		params.MaxResults = 10
-	}
-	if params.MaxResults > 100 {
-		params.MaxResults = 100
-	}
-
-	log.Printf("[DEBUG] 参数验证后的最终值: Query='%s', Start=%d, MaxResults=%d", params.Query, params.Start, params.MaxResults)
-
-	// 验证查询参数
-	if strings.TrimSpace(params.Query) == "" {
-		log.Printf("[ERROR] 搜索关键词为空，终止请求")
-		return nil, nil, fmt.Errorf("搜索关键词不能为空")
-	}
-
-	log.Printf("[INFO] 开始搜索arXiv: 关键词='%s', Start=%d, MaxResults=%d", params.Query, params.Start, params.MaxResults)
-
-	// 创建arXiv客户端并搜索
-	client := arxiv.NewArxivClient()
-	result, err := client.SearchPapers(ctx, params.Query, params.Start, params.MaxResults)
-	if err != nil {
-		log.Printf("[ERROR] arXiv搜索失败: %v", err)
-		return nil, nil, fmt.Errorf("搜索失败: %w", err)
-	}
-
-	// 格式化输出
-	log.Printf("[DEBUG] 开始格式化搜索结果文本输出...")
-	var resultBuilder strings.Builder
-	resultBuilder.WriteString(fmt.Sprintf("🔬 arXiv论文搜索结果 (关键词: '%s')\n", params.Query))
-	resultBuilder.WriteString(fmt.Sprintf("显示第%d-%d条结果，共找到约%d篇论文\n\n", params.Start+1, params.Start+len(result.Papers), result.TotalCount))
-
-	for i, paper := range result.Papers {
-		resultBuilder.WriteString(fmt.Sprintf("📄 %d. %s\n", i+1, paper.Title))
-		resultBuilder.WriteString(fmt.Sprintf("   ID: %s\n", paper.ID))
-		resultBuilder.WriteString(fmt.Sprintf("   作者: %s\n", strings.Join(paper.Authors, ", ")))
-		if paper.Published != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   发布日期: %s\n", paper.Published))
-		}
-		if len(paper.Categories) > 0 {
-			resultBuilder.WriteString(fmt.Sprintf("   分类: %s\n", strings.Join(paper.Categories, ", ")))
-		}
-		if paper.Abstract != "" {
-			abstract := paper.Abstract
-			if len(abstract) > 300 {
-				abstract = abstract[:300] + "..."
-			}
-			resultBuilder.WriteString(fmt.Sprintf("   摘要: %s\n", abstract))
-		}
-		if paper.URL != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   链接: %s\n", paper.URL))
-		}
-		if paper.PDFURL != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   PDF: %s\n", paper.PDFURL))
-		}
-		resultBuilder.WriteString("\n")
-	}
-	log.Printf("[DEBUG] 文本格式化完成，长度: %d 字符", resultBuilder.Len())
-
-	// 将结果转换为JSON用于结构化数据
-	log.Printf("[DEBUG] 开始JSON序列化搜索结果...")
-	jsonResult, err := json.Marshal(result)
-	if err != nil {
-		log.Printf("[ERROR] JSON序列化失败: %v", err)
-	} else {
-		log.Printf("[DEBUG] JSON序列化成功，长度: %d 字节", len(jsonResult))
-	}
-
-	log.Printf("[INFO] ========== arXiv搜索完成 ==========")
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: resultBuilder.String()},
-		},
-		Meta: map[string]interface{}{
-			"structured_data": string(jsonResult),
-		},
-	}, nil, nil
+// ScholarSearchParam 学术论文搜索参数
+type ScholarSearchParam struct {
+	Query          string   `json:"query"`                      // 搜索关键词
+	Author         string   `json:"author,omitempty"`           // 作者筛选
+	Title          string   `json:"title,omitempty"`            // 标题筛选
+	Journal        string   `json:"journal,omitempty"`          // 期刊筛选
+	Year           string   `json:"year,omitempty"`             // 年份筛选
+	Categories     []string `json:"categories,omitempty"`       // 分类筛选
+	MinCitations   int      `json:"min_citations,omitempty"`    // 最小引用数
+	OpenAccessOnly bool     `json:"open_access_only,omitempty"` // 仅开放获取
+	Offset         int      `json:"offset"`                     // 偏移量，默认0
+	Limit          int      `json:"limit"`                      // 限制数量，默认10
+	SortBy         string   `json:"sort_by,omitempty"`          // 排序方式
+	SortOrder      string   `json:"sort_order,omitempty"`       // 排序顺序
+	EnabledSources []string `json:"enabled_sources,omitempty"`  // 启用的数据源
 }
 
-// 获取arXiv论文详情功能
-func getArxivPaper(ctx context.Context, req *mcp.CallToolRequest, params *arxiv.ArxivGetParam) (*mcp.CallToolResult, any, error) {
-	log.Printf("[DEBUG] ========== 开始获取arXiv论文详情 ==========")
-	log.Printf("[DEBUG] 接收到的参数: %+v", params)
-
-	// 验证ID参数
-	if strings.TrimSpace(params.ID) == "" {
-		log.Printf("[ERROR] arXiv ID为空，终止请求")
-		return nil, nil, fmt.Errorf("arXiv ID不能为空")
-	}
-
-	log.Printf("[INFO] 开始获取arXiv论文详情: ID='%s'", params.ID)
-
-	// 创建arXiv客户端并获取论文
-	client := arxiv.NewArxivClient()
-	paper, err := client.GetPaper(ctx, params.ID)
-	if err != nil {
-		log.Printf("[ERROR] 获取arXiv论文详情失败: %v", err)
-		return nil, nil, fmt.Errorf("获取论文详情失败: %w", err)
-	}
-
-	// 格式化输出
-	log.Printf("[DEBUG] 开始格式化论文详情输出...")
-	var resultBuilder strings.Builder
-	resultBuilder.WriteString("📄 arXiv论文详情\n\n")
-	resultBuilder.WriteString(fmt.Sprintf("🆔 ID: %s\n\n", paper.ID))
-	resultBuilder.WriteString(fmt.Sprintf("📝 标题: %s\n\n", paper.Title))
-
-	if len(paper.Authors) > 0 {
-		resultBuilder.WriteString(fmt.Sprintf("👥 作者: %s\n\n", strings.Join(paper.Authors, ", ")))
-	}
-
-	if paper.Published != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📅 发布日期: %s\n", paper.Published))
-	}
-
-	if paper.Updated != "" {
-		resultBuilder.WriteString(fmt.Sprintf("🔄 更新日期: %s\n", paper.Updated))
-	}
-
-	if len(paper.Categories) > 0 {
-		resultBuilder.WriteString(fmt.Sprintf("🏷️ 分类: %s\n\n", strings.Join(paper.Categories, ", ")))
-	}
-
-	if paper.Abstract != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📋 摘要:\n%s\n\n", paper.Abstract))
-	}
-
-	if paper.JournalRef != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📖 期刊引用: %s\n", paper.JournalRef))
-	}
-
-	if paper.DOI != "" {
-		resultBuilder.WriteString(fmt.Sprintf("🔗 DOI: %s\n", paper.DOI))
-	}
-
-	if paper.Comment != "" {
-		resultBuilder.WriteString(fmt.Sprintf("💬 注释: %s\n", paper.Comment))
-	}
-
-	if paper.URL != "" {
-		resultBuilder.WriteString(fmt.Sprintf("🌐 arXiv链接: %s\n", paper.URL))
-	}
-
-	if paper.PDFURL != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📄 PDF下载: %s\n", paper.PDFURL))
-	}
-
-	log.Printf("[DEBUG] 论文详情文本格式化完成，长度: %d 字符", resultBuilder.Len())
-
-	// 将结果转换为JSON
-	log.Printf("[DEBUG] 开始JSON序列化论文详情...")
-	jsonResult, err := json.Marshal(paper)
-	if err != nil {
-		log.Printf("[ERROR] JSON序列化失败: %v", err)
-	} else {
-		log.Printf("[DEBUG] JSON序列化成功，长度: %d 字节", len(jsonResult))
-	}
-
-	log.Printf("[INFO] ========== arXiv论文详情获取完成 ==========")
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: resultBuilder.String()},
-		},
-		Meta: map[string]interface{}{
-			"structured_data": string(jsonResult),
-		},
-	}, nil, nil
+// ScholarGetParam 获取论文详情参数
+type ScholarGetParam struct {
+	Identifier string `json:"identifier"` // 论文标识符 (DOI, arXiv ID, PubMed ID等)
 }
 
-// Semantic Scholar搜索功能
-func searchSemanticScholarPapers(ctx context.Context, req *mcp.CallToolRequest, params *semanticscholar.SemanticScholarSearchParam) (*mcp.CallToolResult, any, error) {
-	log.Printf("[DEBUG] ========== 开始搜索Semantic Scholar论文 ==========")
+// 统一的学术论文搜索功能
+func searchScholarPapers(ctx context.Context, req *mcp.CallToolRequest, params *ScholarSearchParam) (*mcp.CallToolResult, any, error) {
+	log.Printf("[DEBUG] ========== 开始聚合搜索学术论文 ==========")
 	log.Printf("[DEBUG] 接收到的原始参数: %+v", params)
 
 	// 设置默认值
@@ -219,41 +184,68 @@ func searchSemanticScholarPapers(ctx context.Context, req *mcp.CallToolRequest, 
 		return nil, nil, fmt.Errorf("搜索关键词不能为空")
 	}
 
-	log.Printf("[INFO] 开始搜索Semantic Scholar: 关键词='%s', Offset=%d, Limit=%d", params.Query, params.Offset, params.Limit)
+	log.Printf("[INFO] 开始聚合搜索: 关键词='%s', Offset=%d, Limit=%d", params.Query, params.Offset, params.Limit)
 
-	// 创建Semantic Scholar客户端并搜索
-	client := semanticscholar.NewSemanticScholarClient()
-	result, err := client.SearchPapers(ctx, params.Query, params.Offset, params.Limit)
+	// 转换为通用搜索参数
+	searchParams := common.SearchParams{
+		Query:          params.Query,
+		Author:         params.Author,
+		Title:          params.Title,
+		Journal:        params.Journal,
+		Year:           params.Year,
+		Categories:     params.Categories,
+		MinCitations:   params.MinCitations,
+		OpenAccessOnly: params.OpenAccessOnly,
+		Offset:         params.Offset,
+		Limit:          params.Limit,
+		SortBy:         params.SortBy,
+		SortOrder:      params.SortOrder,
+	}
+
+	// 创建聚合器并搜索
+	agg := aggregator.NewScholarAggregator()
+	result, err := agg.SearchPapers(ctx, searchParams)
 	if err != nil {
-		log.Printf("[ERROR] Semantic Scholar搜索失败: %v", err)
+		log.Printf("[ERROR] 聚合搜索失败: %v", err)
 		return nil, nil, fmt.Errorf("搜索失败: %w", err)
 	}
 
 	// 格式化输出
 	var resultBuilder strings.Builder
-	resultBuilder.WriteString(fmt.Sprintf("🔬 Semantic Scholar论文搜索结果 (关键词: '%s')\n", params.Query))
-	resultBuilder.WriteString(fmt.Sprintf("显示第%d-%d条结果，共找到约%d篇论文\n\n", params.Offset+1, params.Offset+len(result.Papers), result.Total))
+	resultBuilder.WriteString(fmt.Sprintf("🔬 学术论文聚合搜索结果 (关键词: '%s')\n", params.Query))
+	resultBuilder.WriteString(fmt.Sprintf("数据源: %d个总计, %d个活跃\n", result.TotalSources, result.ActiveSources))
+	resultBuilder.WriteString(fmt.Sprintf("搜索耗时: %v\n", result.SearchTime))
+	resultBuilder.WriteString(fmt.Sprintf("显示第%d-%d条结果，共找到约%d篇论文\n\n", params.Offset+1, params.Offset+len(result.Papers), result.TotalResults))
 
 	for i, paper := range result.Papers {
 		resultBuilder.WriteString(fmt.Sprintf("📄 %d. %s\n", i+1, paper.Title))
-		resultBuilder.WriteString(fmt.Sprintf("   Paper ID: %s\n", paper.PaperID))
-		
+		resultBuilder.WriteString(fmt.Sprintf("   来源: %s\n", paper.Source))
+		if paper.ID != "" {
+			resultBuilder.WriteString(fmt.Sprintf("   ID: %s\n", paper.ID))
+		}
+		if paper.DOI != "" {
+			resultBuilder.WriteString(fmt.Sprintf("   DOI: %s\n", paper.DOI))
+		}
+
 		if len(paper.Authors) > 0 {
-			var authorNames []string
-			for _, author := range paper.Authors {
-				authorNames = append(authorNames, author.Name)
+			authors := strings.Join(paper.Authors, ", ")
+			if len(authors) > 100 {
+				authors = authors[:100] + "..."
 			}
-			resultBuilder.WriteString(fmt.Sprintf("   作者: %s\n", strings.Join(authorNames, ", ")))
+			resultBuilder.WriteString(fmt.Sprintf("   作者: %s\n", authors))
 		}
-		
-		if paper.Year > 0 {
-			resultBuilder.WriteString(fmt.Sprintf("   年份: %d\n", paper.Year))
+
+		if paper.Journal != "" {
+			resultBuilder.WriteString(fmt.Sprintf("   期刊: %s\n", paper.Journal))
 		}
-		if paper.Venue != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   发表场所: %s\n", paper.Venue))
+		if paper.PublishedDate != "" {
+			resultBuilder.WriteString(fmt.Sprintf("   发表日期: %s\n", paper.PublishedDate))
 		}
 		if paper.CitationCount > 0 {
 			resultBuilder.WriteString(fmt.Sprintf("   引用数: %d\n", paper.CitationCount))
+		}
+		if paper.IsOpenAccess {
+			resultBuilder.WriteString("   📖 开放获取\n")
 		}
 		if paper.Abstract != "" {
 			abstract := paper.Abstract
@@ -265,7 +257,29 @@ func searchSemanticScholarPapers(ctx context.Context, req *mcp.CallToolRequest, 
 		if paper.URL != "" {
 			resultBuilder.WriteString(fmt.Sprintf("   链接: %s\n", paper.URL))
 		}
+		if paper.PDFURL != "" {
+			resultBuilder.WriteString(fmt.Sprintf("   PDF: %s\n", paper.PDFURL))
+		}
 		resultBuilder.WriteString("\n")
+	}
+
+	// 添加数据源状态信息
+	resultBuilder.WriteString("📊 数据源状态:\n")
+	for _, status := range result.SourceStatus {
+		statusIcon := "❌"
+		if status.Available {
+			statusIcon = "✅"
+		}
+		resultBuilder.WriteString(fmt.Sprintf("   %s %s: %s (%dms)\n",
+			statusIcon, status.Source, status.Message, status.ResponseTime))
+	}
+
+	// 添加搜索建议
+	if len(result.Suggestions) > 0 {
+		resultBuilder.WriteString("\n💡 搜索建议:\n")
+		for _, hint := range result.Suggestions {
+			resultBuilder.WriteString(fmt.Sprintf("   - %s: %s\n", hint.Type, hint.Description))
+		}
 	}
 
 	// 将结果转换为JSON
@@ -274,7 +288,7 @@ func searchSemanticScholarPapers(ctx context.Context, req *mcp.CallToolRequest, 
 		log.Printf("[ERROR] JSON序列化失败: %v", err)
 	}
 
-	log.Printf("[INFO] ========== Semantic Scholar搜索完成 ==========")
+	log.Printf("[INFO] ========== 聚合搜索完成 ==========")
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: resultBuilder.String()},
@@ -285,236 +299,52 @@ func searchSemanticScholarPapers(ctx context.Context, req *mcp.CallToolRequest, 
 	}, nil, nil
 }
 
-// 获取Semantic Scholar论文详情功能
-func getSemanticScholarPaper(ctx context.Context, req *mcp.CallToolRequest, params *semanticscholar.SemanticScholarGetParam) (*mcp.CallToolResult, any, error) {
-	log.Printf("[DEBUG] ========== 开始获取Semantic Scholar论文详情 ==========")
+// 获取学术论文详情功能
+func getScholarPaper(ctx context.Context, req *mcp.CallToolRequest, params *ScholarGetParam) (*mcp.CallToolResult, any, error) {
+	log.Printf("[DEBUG] ========== 开始获取学术论文详情 ==========")
 	log.Printf("[DEBUG] 接收到的参数: %+v", params)
 
-	// 验证ID参数
-	if strings.TrimSpace(params.PaperID) == "" {
-		log.Printf("[ERROR] Paper ID为空，终止请求")
-		return nil, nil, fmt.Errorf("Paper ID不能为空")
+	// 验证标识符参数
+	if strings.TrimSpace(params.Identifier) == "" {
+		log.Printf("[ERROR] 论文标识符为空，终止请求")
+		return nil, nil, fmt.Errorf("论文标识符不能为空")
 	}
 
-	log.Printf("[INFO] 开始获取Semantic Scholar论文详情: ID='%s'", params.PaperID)
+	log.Printf("[INFO] 开始获取论文详情: 标识符='%s'", params.Identifier)
 
-	// 创建Semantic Scholar客户端并获取论文
-	client := semanticscholar.NewSemanticScholarClient()
-	paper, err := client.GetPaper(ctx, params.PaperID)
+	// 创建聚合器并获取论文
+	agg := aggregator.NewScholarAggregator()
+	paper, err := agg.GetPaper(ctx, params.Identifier)
 	if err != nil {
-		log.Printf("[ERROR] 获取Semantic Scholar论文详情失败: %v", err)
+		log.Printf("[ERROR] 获取论文详情失败: %v", err)
 		return nil, nil, fmt.Errorf("获取论文详情失败: %w", err)
 	}
 
 	// 格式化输出
 	var resultBuilder strings.Builder
-	resultBuilder.WriteString("📄 Semantic Scholar论文详情\n\n")
-	resultBuilder.WriteString(fmt.Sprintf("🆔 Paper ID: %s\n\n", paper.PaperID))
+	resultBuilder.WriteString("📄 学术论文详情\n\n")
 	resultBuilder.WriteString(fmt.Sprintf("📝 标题: %s\n\n", paper.Title))
+	resultBuilder.WriteString(fmt.Sprintf("🗃️ 数据源: %s\n", paper.Source))
+
+	if paper.ID != "" {
+		resultBuilder.WriteString(fmt.Sprintf("🆔 ID: %s\n", paper.ID))
+	}
+	if paper.DOI != "" {
+		resultBuilder.WriteString(fmt.Sprintf("🔗 DOI: %s\n", paper.DOI))
+	}
 
 	if len(paper.Authors) > 0 {
-		var authorNames []string
-		for _, author := range paper.Authors {
-			authorNames = append(authorNames, author.Name)
-		}
-		resultBuilder.WriteString(fmt.Sprintf("👥 作者: %s\n\n", strings.Join(authorNames, ", ")))
+		resultBuilder.WriteString(fmt.Sprintf("👥 作者: %s\n\n", strings.Join(paper.Authors, ", ")))
 	}
 
-	if paper.Year > 0 {
-		resultBuilder.WriteString(fmt.Sprintf("📅 年份: %d\n", paper.Year))
-	}
-	if paper.Venue != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📍 发表场所: %s\n", paper.Venue))
-	}
-	if paper.CitationCount > 0 {
-		resultBuilder.WriteString(fmt.Sprintf("📊 引用数: %d\n", paper.CitationCount))
-	}
-	if paper.ReferenceCount > 0 {
-		resultBuilder.WriteString(fmt.Sprintf("📚 参考文献数: %d\n", paper.ReferenceCount))
-	}
-	if paper.InfluentialCitationCount > 0 {
-		resultBuilder.WriteString(fmt.Sprintf("⭐ 有影响力引用数: %d\n", paper.InfluentialCitationCount))
-	}
-
-	if len(paper.FieldsOfStudy) > 0 {
-		resultBuilder.WriteString(fmt.Sprintf("🏷️ 研究领域: %s\n\n", strings.Join(paper.FieldsOfStudy, ", ")))
-	}
-
-	if paper.Abstract != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📋 摘要:\n%s\n\n", paper.Abstract))
-	}
-
-	if paper.ExternalIDs.DOI != "" {
-		resultBuilder.WriteString(fmt.Sprintf("🔗 DOI: %s\n", paper.ExternalIDs.DOI))
-	}
-	if paper.ExternalIDs.ArXiv != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📖 arXiv: %s\n", paper.ExternalIDs.ArXiv))
-	}
-	if paper.URL != "" {
-		resultBuilder.WriteString(fmt.Sprintf("🌐 Semantic Scholar链接: %s\n", paper.URL))
-	}
-
-	// 将结果转换为JSON
-	jsonResult, err := json.Marshal(paper)
-	if err != nil {
-		log.Printf("[ERROR] JSON序列化失败: %v", err)
-	}
-
-	log.Printf("[INFO] ========== Semantic Scholar论文详情获取完成 ==========")
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: resultBuilder.String()},
-		},
-		Meta: map[string]interface{}{
-			"structured_data": string(jsonResult),
-		},
-	}, nil, nil
-}
-
-// Crossref搜索功能
-func searchCrossrefPapers(ctx context.Context, req *mcp.CallToolRequest, params *crossref.CrossrefSearchParam) (*mcp.CallToolResult, any, error) {
-	log.Printf("[DEBUG] ========== 开始搜索Crossref论文 ==========")
-
-	// 设置默认值
-	if params.Offset < 0 {
-		params.Offset = 0
-	}
-	if params.Rows <= 0 {
-		params.Rows = 20
-	}
-	if params.Rows > 1000 {
-		params.Rows = 1000
-	}
-
-	// 验证查询参数
-	if strings.TrimSpace(params.Query) == "" {
-		return nil, nil, fmt.Errorf("搜索关键词不能为空")
-	}
-
-	log.Printf("[INFO] 开始搜索Crossref: 关键词='%s', Offset=%d, Rows=%d", params.Query, params.Offset, params.Rows)
-
-	// 创建Crossref客户端并搜索
-	client := crossref.NewCrossrefClient()
-	result, err := client.SearchPapers(ctx, params.Query, params.Offset, params.Rows)
-	if err != nil {
-		log.Printf("[ERROR] Crossref搜索失败: %v", err)
-		return nil, nil, fmt.Errorf("搜索失败: %w", err)
-	}
-
-	// 格式化输出
-	var resultBuilder strings.Builder
-	resultBuilder.WriteString(fmt.Sprintf("🔬 Crossref论文搜索结果 (关键词: '%s')\n", params.Query))
-	resultBuilder.WriteString(fmt.Sprintf("显示第%d-%d条结果，共找到约%d篇论文\n\n", params.Offset+1, params.Offset+len(result.Papers), result.TotalResults))
-
-	for i, paper := range result.Papers {
-		title := ""
-		if len(paper.Title) > 0 {
-			title = paper.Title[0]
-		}
-		resultBuilder.WriteString(fmt.Sprintf("📄 %d. %s\n", i+1, title))
-		resultBuilder.WriteString(fmt.Sprintf("   DOI: %s\n", paper.DOI))
-		
-		if len(paper.Author) > 0 {
-			var authorNames []string
-			for _, author := range paper.Author {
-				name := ""
-				if author.Given != "" && author.Family != "" {
-					name = author.Given + " " + author.Family
-				} else if author.Family != "" {
-					name = author.Family
-				}
-				if name != "" {
-					authorNames = append(authorNames, name)
-				}
-			}
-			if len(authorNames) > 0 {
-				resultBuilder.WriteString(fmt.Sprintf("   作者: %s\n", strings.Join(authorNames, ", ")))
-			}
-		}
-		
-		if len(paper.ContainerTitle) > 0 {
-			resultBuilder.WriteString(fmt.Sprintf("   期刊: %s\n", paper.ContainerTitle[0]))
-		}
-		if paper.Publisher != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   出版商: %s\n", paper.Publisher))
-		}
-		if paper.IsReferencedByCount > 0 {
-			resultBuilder.WriteString(fmt.Sprintf("   被引用数: %d\n", paper.IsReferencedByCount))
-		}
-		if paper.URL != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   链接: %s\n", paper.URL))
-		}
-		resultBuilder.WriteString("\n")
-	}
-
-	// 将结果转换为JSON
-	jsonResult, err := json.Marshal(result)
-	if err != nil {
-		log.Printf("[ERROR] JSON序列化失败: %v", err)
-	}
-
-	log.Printf("[INFO] ========== Crossref搜索完成 ==========")
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: resultBuilder.String()},
-		},
-		Meta: map[string]interface{}{
-			"structured_data": string(jsonResult),
-		},
-	}, nil, nil
-}
-
-// 获取Crossref论文详情功能
-func getCrossrefPaper(ctx context.Context, req *mcp.CallToolRequest, params *crossref.CrossrefGetParam) (*mcp.CallToolResult, any, error) {
-	log.Printf("[DEBUG] ========== 开始获取Crossref论文详情 ==========")
-
-	// 验证DOI参数
-	if strings.TrimSpace(params.DOI) == "" {
-		return nil, nil, fmt.Errorf("DOI不能为空")
-	}
-
-	log.Printf("[INFO] 开始获取Crossref论文详情: DOI='%s'", params.DOI)
-
-	// 创建Crossref客户端并获取论文
-	client := crossref.NewCrossrefClient()
-	paper, err := client.GetPaper(ctx, params.DOI)
-	if err != nil {
-		log.Printf("[ERROR] 获取Crossref论文详情失败: %v", err)
-		return nil, nil, fmt.Errorf("获取论文详情失败: %w", err)
-	}
-
-	// 格式化输出
-	var resultBuilder strings.Builder
-	resultBuilder.WriteString("📄 Crossref论文详情\n\n")
-	resultBuilder.WriteString(fmt.Sprintf("🆔 DOI: %s\n\n", paper.DOI))
-	
-	if len(paper.Title) > 0 {
-		resultBuilder.WriteString(fmt.Sprintf("📝 标题: %s\n\n", paper.Title[0]))
-	}
-
-	if len(paper.Author) > 0 {
-		var authorNames []string
-		for _, author := range paper.Author {
-			name := ""
-			if author.Given != "" && author.Family != "" {
-				name = author.Given + " " + author.Family
-			} else if author.Family != "" {
-				name = author.Family
-			}
-			if name != "" {
-				authorNames = append(authorNames, name)
-			}
-		}
-		if len(authorNames) > 0 {
-			resultBuilder.WriteString(fmt.Sprintf("👥 作者: %s\n\n", strings.Join(authorNames, ", ")))
-		}
-	}
-
-	if len(paper.ContainerTitle) > 0 {
-		resultBuilder.WriteString(fmt.Sprintf("📍 期刊: %s\n", paper.ContainerTitle[0]))
+	if paper.Journal != "" {
+		resultBuilder.WriteString(fmt.Sprintf("📍 期刊: %s\n", paper.Journal))
 	}
 	if paper.Publisher != "" {
 		resultBuilder.WriteString(fmt.Sprintf("🏢 出版商: %s\n", paper.Publisher))
+	}
+	if paper.PublishedDate != "" {
+		resultBuilder.WriteString(fmt.Sprintf("📅 发表日期: %s\n", paper.PublishedDate))
 	}
 	if paper.Volume != "" {
 		resultBuilder.WriteString(fmt.Sprintf("📖 卷号: %s\n", paper.Volume))
@@ -522,14 +352,52 @@ func getCrossrefPaper(ctx context.Context, req *mcp.CallToolRequest, params *cro
 	if paper.Issue != "" {
 		resultBuilder.WriteString(fmt.Sprintf("📄 期号: %s\n", paper.Issue))
 	}
-	if paper.Page != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📄 页码: %s\n", paper.Page))
+	if paper.Pages != "" {
+		resultBuilder.WriteString(fmt.Sprintf("📄 页码: %s\n", paper.Pages))
 	}
-	if paper.IsReferencedByCount > 0 {
-		resultBuilder.WriteString(fmt.Sprintf("📊 被引用数: %d\n", paper.IsReferencedByCount))
+
+	if paper.CitationCount > 0 {
+		resultBuilder.WriteString(fmt.Sprintf("📊 引用数: %d\n", paper.CitationCount))
 	}
+	if paper.ReadCount > 0 {
+		resultBuilder.WriteString(fmt.Sprintf("👁️ 阅读数: %d\n", paper.ReadCount))
+	}
+
+	if paper.IsOpenAccess {
+		resultBuilder.WriteString("📖 开放获取: 是\n")
+	}
+
+	if len(paper.Categories) > 0 {
+		resultBuilder.WriteString(fmt.Sprintf("🏷️ 分类: %s\n", strings.Join(paper.Categories, ", ")))
+	}
+
+	if paper.Language != "" {
+		resultBuilder.WriteString(fmt.Sprintf("🌐 语言: %s\n", paper.Language))
+	}
+
+	if paper.Type != "" {
+		resultBuilder.WriteString(fmt.Sprintf("📋 类型: %s\n", paper.Type))
+	}
+
+	if paper.Abstract != "" {
+		resultBuilder.WriteString(fmt.Sprintf("\n📋 摘要:\n%s\n", paper.Abstract))
+	}
+
+	// 外部链接
+	if len(paper.ExternalIDs) > 0 {
+		resultBuilder.WriteString("\n🔗 外部链接:\n")
+		for source, id := range paper.ExternalIDs {
+			if id != "" {
+				resultBuilder.WriteString(fmt.Sprintf("   %s: %s\n", source, id))
+			}
+		}
+	}
+
 	if paper.URL != "" {
-		resultBuilder.WriteString(fmt.Sprintf("🌐 Crossref链接: %s\n", paper.URL))
+		resultBuilder.WriteString(fmt.Sprintf("\n🌐 原始链接: %s\n", paper.URL))
+	}
+	if paper.PDFURL != "" {
+		resultBuilder.WriteString(fmt.Sprintf("📄 PDF下载: %s\n", paper.PDFURL))
 	}
 
 	// 将结果转换为JSON
@@ -538,260 +406,7 @@ func getCrossrefPaper(ctx context.Context, req *mcp.CallToolRequest, params *cro
 		log.Printf("[ERROR] JSON序列化失败: %v", err)
 	}
 
-	log.Printf("[INFO] ========== Crossref论文详情获取完成 ==========")
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: resultBuilder.String()},
-		},
-		Meta: map[string]interface{}{
-			"structured_data": string(jsonResult),
-		},
-	}, nil, nil
-}
-
-// Scopus搜索功能 (需要API密钥)
-func searchScopusPapers(ctx context.Context, req *mcp.CallToolRequest, params *scopus.ScopusSearchParam) (*mcp.CallToolResult, any, error) {
-	log.Printf("[DEBUG] ========== 开始搜索Scopus论文 ==========")
-
-	// 从环境变量获取API密钥
-	apiKey := os.Getenv("SCOPUS_API_KEY")
-	if apiKey == "" {
-		return nil, nil, fmt.Errorf("Scopus API密钥未设置，请设置SCOPUS_API_KEY环境变量")
-	}
-
-	// 设置默认值
-	if params.Start < 0 {
-		params.Start = 0
-	}
-	if params.Count <= 0 {
-		params.Count = 25
-	}
-	if params.Count > 200 {
-		params.Count = 200
-	}
-
-	// 验证查询参数
-	if strings.TrimSpace(params.Query) == "" {
-		return nil, nil, fmt.Errorf("搜索关键词不能为空")
-	}
-
-	log.Printf("[INFO] 开始搜索Scopus: 关键词='%s', Start=%d, Count=%d", params.Query, params.Start, params.Count)
-
-	// 创建Scopus客户端并搜索
-	client := scopus.NewScopusClient(apiKey)
-	result, err := client.SearchPapers(ctx, params.Query, params.Start, params.Count)
-	if err != nil {
-		log.Printf("[ERROR] Scopus搜索失败: %v", err)
-		return nil, nil, fmt.Errorf("搜索失败: %w", err)
-	}
-
-	// 格式化输出
-	var resultBuilder strings.Builder
-	resultBuilder.WriteString(fmt.Sprintf("🔬 Scopus论文搜索结果 (关键词: '%s')\n", params.Query))
-	resultBuilder.WriteString(fmt.Sprintf("显示第%d-%d条结果，共找到约%d篇论文\n\n", params.Start+1, params.Start+len(result.Papers), result.TotalCount))
-
-	for i, paper := range result.Papers {
-		resultBuilder.WriteString(fmt.Sprintf("📄 %d. %s\n", i+1, paper.Title))
-		resultBuilder.WriteString(fmt.Sprintf("   EID: %s\n", paper.EID))
-		
-		if len(paper.Author) > 0 {
-			var authorNames []string
-			for _, author := range paper.Author {
-				authorNames = append(authorNames, author.AuthorName)
-			}
-			resultBuilder.WriteString(fmt.Sprintf("   作者: %s\n", strings.Join(authorNames, ", ")))
-		}
-		
-		if paper.PublicationName != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   期刊: %s\n", paper.PublicationName))
-		}
-		if paper.CoverDate != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   发表日期: %s\n", paper.CoverDate))
-		}
-		if paper.CitedByCount > 0 {
-			resultBuilder.WriteString(fmt.Sprintf("   引用数: %d\n", paper.CitedByCount))
-		}
-		if paper.DOI != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   DOI: %s\n", paper.DOI))
-		}
-		if paper.URL != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   链接: %s\n", paper.URL))
-		}
-		resultBuilder.WriteString("\n")
-	}
-
-	// 将结果转换为JSON
-	jsonResult, err := json.Marshal(result)
-	if err != nil {
-		log.Printf("[ERROR] JSON序列化失败: %v", err)
-	}
-
-	log.Printf("[INFO] ========== Scopus搜索完成 ==========")
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: resultBuilder.String()},
-		},
-		Meta: map[string]interface{}{
-			"structured_data": string(jsonResult),
-		},
-	}, nil, nil
-}
-
-// ADSABS搜索功能 (需要API密钥)
-func searchAdsabsPapers(ctx context.Context, req *mcp.CallToolRequest, params *adsabs.AdsabsSearchParam) (*mcp.CallToolResult, any, error) {
-	log.Printf("[DEBUG] ========== 开始搜索ADSABS论文 ==========")
-
-	// 从环境变量获取API密钥
-	apiKey := os.Getenv("ADSABS_API_KEY")
-	if apiKey == "" {
-		return nil, nil, fmt.Errorf("ADSABS API密钥未设置，请设置ADSABS_API_KEY环境变量")
-	}
-
-	// 设置默认值
-	if params.Start < 0 {
-		params.Start = 0
-	}
-	if params.Rows <= 0 {
-		params.Rows = 10
-	}
-	if params.Rows > 2000 {
-		params.Rows = 2000
-	}
-
-	// 验证查询参数
-	if strings.TrimSpace(params.Query) == "" {
-		return nil, nil, fmt.Errorf("搜索关键词不能为空")
-	}
-
-	log.Printf("[INFO] 开始搜索ADSABS: 关键词='%s', Start=%d, Rows=%d", params.Query, params.Start, params.Rows)
-
-	// 创建ADSABS客户端并搜索
-	client := adsabs.NewAdsabsClient(apiKey)
-	result, err := client.SearchPapers(ctx, params.Query, params.Start, params.Rows)
-	if err != nil {
-		log.Printf("[ERROR] ADSABS搜索失败: %v", err)
-		return nil, nil, fmt.Errorf("搜索失败: %w", err)
-	}
-
-	// 格式化输出
-	var resultBuilder strings.Builder
-	resultBuilder.WriteString(fmt.Sprintf("🔬 ADSABS论文搜索结果 (关键词: '%s')\n", params.Query))
-	resultBuilder.WriteString(fmt.Sprintf("显示第%d-%d条结果，共找到约%d篇论文\n\n", params.Start+1, params.Start+len(result.Papers), result.NumFound))
-
-	for i, paper := range result.Papers {
-		title := ""
-		if len(paper.Title) > 0 {
-			title = paper.Title[0]
-		}
-		resultBuilder.WriteString(fmt.Sprintf("📄 %d. %s\n", i+1, title))
-		resultBuilder.WriteString(fmt.Sprintf("   Bibcode: %s\n", paper.Bibcode))
-		
-		if len(paper.Author) > 0 {
-			resultBuilder.WriteString(fmt.Sprintf("   作者: %s\n", strings.Join(paper.Author, ", ")))
-		}
-		
-		if paper.Pub != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   期刊: %s\n", paper.Pub))
-		}
-		if paper.PubDate != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   发表日期: %s\n", paper.PubDate))
-		}
-		if paper.CitationCount > 0 {
-			resultBuilder.WriteString(fmt.Sprintf("   引用数: %d\n", paper.CitationCount))
-		}
-		if len(paper.DOI) > 0 {
-			resultBuilder.WriteString(fmt.Sprintf("   DOI: %s\n", paper.DOI[0]))
-		}
-		if paper.Abstract != "" {
-			abstract := paper.Abstract
-			if len(abstract) > 300 {
-				abstract = abstract[:300] + "..."
-			}
-			resultBuilder.WriteString(fmt.Sprintf("   摘要: %s\n", abstract))
-		}
-		resultBuilder.WriteString("\n")
-	}
-
-	// 将结果转换为JSON
-	jsonResult, err := json.Marshal(result)
-	if err != nil {
-		log.Printf("[ERROR] JSON序列化失败: %v", err)
-	}
-
-	log.Printf("[INFO] ========== ADSABS搜索完成 ==========")
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{
-			&mcp.TextContent{Text: resultBuilder.String()},
-		},
-		Meta: map[string]interface{}{
-			"structured_data": string(jsonResult),
-		},
-	}, nil, nil
-}
-
-// Sci-Hub搜索功能
-func searchSciHubPapers(ctx context.Context, req *mcp.CallToolRequest, params *scihub.SciHubSearchParam) (*mcp.CallToolResult, any, error) {
-	log.Printf("[DEBUG] ========== 开始搜索Sci-Hub论文 ==========")
-
-	// 设置默认值
-	if params.MaxResults <= 0 {
-		params.MaxResults = 10
-	}
-	if params.MaxResults > 50 {
-		params.MaxResults = 50
-	}
-
-	// 验证查询参数
-	if strings.TrimSpace(params.Query) == "" {
-		return nil, nil, fmt.Errorf("搜索关键词不能为空")
-	}
-
-	log.Printf("[INFO] 开始搜索Sci-Hub: 关键词='%s', MaxResults=%d", params.Query, params.MaxResults)
-
-	// 创建Sci-Hub客户端并搜索
-	client := scihub.NewSciHubClient()
-	result, err := client.SearchPapers(ctx, params.Query, params.MaxResults)
-	if err != nil {
-		log.Printf("[ERROR] Sci-Hub搜索失败: %v", err)
-		return nil, nil, fmt.Errorf("搜索失败: %w", err)
-	}
-
-	// 格式化输出
-	var resultBuilder strings.Builder
-	resultBuilder.WriteString(fmt.Sprintf("🔬 Sci-Hub论文搜索结果 (关键词: '%s')\n", params.Query))
-	resultBuilder.WriteString(fmt.Sprintf("找到%d篇论文\n\n", len(result.Papers)))
-
-	for i, paper := range result.Papers {
-		resultBuilder.WriteString(fmt.Sprintf("📄 %d. %s\n", i+1, paper.Title))
-		if paper.DOI != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   DOI: %s\n", paper.DOI))
-		}
-		if paper.Authors != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   作者: %s\n", paper.Authors))
-		}
-		if paper.Journal != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   期刊: %s\n", paper.Journal))
-		}
-		if paper.Year != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   年份: %s\n", paper.Year))
-		}
-		resultBuilder.WriteString(fmt.Sprintf("   PDF可用: %t\n", paper.Available))
-		if paper.PDFURL != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   PDF链接: %s\n", paper.PDFURL))
-		}
-		if paper.SciHubURL != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   Sci-Hub链接: %s\n", paper.SciHubURL))
-		}
-		resultBuilder.WriteString("\n")
-	}
-
-	// 将结果转换为JSON
-	jsonResult, err := json.Marshal(result)
-	if err != nil {
-		log.Printf("[ERROR] JSON序列化失败: %v", err)
-	}
-
-	log.Printf("[INFO] ========== Sci-Hub搜索完成 ==========")
+	log.Printf("[INFO] ========== 学术论文详情获取完成 ==========")
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: resultBuilder.String()},
@@ -803,86 +418,30 @@ func searchSciHubPapers(ctx context.Context, req *mcp.CallToolRequest, params *s
 }
 
 func main() {
-	log.Printf("[INFO] ========== 学术论文检索MCP服务器启动 ==========")
-	log.Printf("[INFO] 正在初始化多数据源论文检索MCP服务器...")
+	log.Printf("[INFO] ========== 学术论文检索聚合MCP服务器启动 ==========")
+	log.Printf("[INFO] 正在初始化统一学术论文检索MCP服务器...")
 
 	server := mcp.NewServer(&mcp.Implementation{
-		Name:    "academic-papers-mcp-server",
+		Name:    "scholar-aggregator-mcp-server",
 		Version: "2.0.0",
 	}, nil)
-	log.Printf("[DEBUG] MCP服务器创建完成，名称: %s, 版本: %s", "academic-papers-mcp-server", "2.0.0")
+	log.Printf("[DEBUG] MCP服务器创建完成，名称: %s, 版本: %s", "scholar-aggregator-mcp-server", "2.0.0")
 
-	// 添加arXiv论文搜索工具
-	log.Printf("[DEBUG] 正在注册arXiv论文搜索工具...")
+	// 添加统一的学术论文搜索工具
+	log.Printf("[DEBUG] 正在注册统一学术论文搜索工具...")
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "searchArxivPapers",
-		Description: "Search academic papers from arXiv. Supports keywords, categories, authors, and advanced search queries. Returns paper titles, authors, abstracts, categories, and download links.",
-	}, searchArxivPapers)
-	log.Printf("[INFO] arXiv论文搜索工具注册完成")
+		Name:        "searchScholarPapers",
+		Description: "Search academic papers from multiple sources simultaneously (arXiv, Semantic Scholar, Crossref, Scopus, ADSABS, Sci-Hub). Automatically aggregates, deduplicates, and ranks results. Supports advanced filtering by author, journal, year, citations, and open access status. Returns unified paper metadata with source attribution.",
+	}, searchScholarPapers)
+	log.Printf("[INFO] 统一学术论文搜索工具注册完成")
 
-	// 添加获取arXiv论文详情工具
-	log.Printf("[DEBUG] 正在注册arXiv论文详情获取工具...")
+	// 添加获取学术论文详情工具
+	log.Printf("[DEBUG] 正在注册学术论文详情获取工具...")
 	mcp.AddTool(server, &mcp.Tool{
-		Name:        "getArxivPaper",
-		Description: "Get detailed information of a specific paper by arXiv ID. Returns complete paper metadata including title, authors, abstract, categories, publication dates, and download links.",
-	}, getArxivPaper)
-	log.Printf("[INFO] arXiv论文详情获取工具注册完成")
-
-	// 添加Semantic Scholar论文搜索工具
-	log.Printf("[DEBUG] 正在注册Semantic Scholar论文搜索工具...")
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "searchSemanticScholarPapers",
-		Description: "Search academic papers from Semantic Scholar. Supports keywords, author names, venue names with advanced filtering options. Returns paper titles, authors, abstracts, citation counts, and venue information.",
-	}, searchSemanticScholarPapers)
-	log.Printf("[INFO] Semantic Scholar论文搜索工具注册完成")
-
-	// 添加获取Semantic Scholar论文详情工具
-	log.Printf("[DEBUG] 正在注册Semantic Scholar论文详情获取工具...")
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "getSemanticScholarPaper",
-		Description: "Get detailed information of a specific paper by Semantic Scholar Paper ID, DOI, or arXiv ID. Returns complete paper metadata including citation metrics, influential citations, and external IDs.",
-	}, getSemanticScholarPaper)
-	log.Printf("[INFO] Semantic Scholar论文详情获取工具注册完成")
-
-	// 添加Crossref论文搜索工具
-	log.Printf("[DEBUG] 正在注册Crossref论文搜索工具...")
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "searchCrossrefPapers",
-		Description: "Search academic papers from Crossref database. Supports keywords, author names, journal titles, publisher names with DOI-based identification. Returns comprehensive publication metadata.",
-	}, searchCrossrefPapers)
-	log.Printf("[INFO] Crossref论文搜索工具注册完成")
-
-	// 添加获取Crossref论文详情工具
-	log.Printf("[DEBUG] 正在注册Crossref论文详情获取工具...")
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "getCrossrefPaper",
-		Description: "Get detailed information of a specific paper by DOI from Crossref. Returns complete publication metadata including author affiliations, funding information, and license details.",
-	}, getCrossrefPaper)
-	log.Printf("[INFO] Crossref论文详情获取工具注册完成")
-
-	// 添加Scopus论文搜索工具 (需要API密钥)
-	log.Printf("[DEBUG] 正在注册Scopus论文搜索工具...")
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "searchScopusPapers",
-		Description: "Search academic papers from Scopus database. Requires SCOPUS_API_KEY environment variable. Supports advanced queries with author, journal, subject area filtering. Returns citation metrics and affiliation data.",
-	}, searchScopusPapers)
-	log.Printf("[INFO] Scopus论文搜索工具注册完成")
-
-	// 添加ADSABS论文搜索工具 (需要API密钥)
-	log.Printf("[DEBUG] 正在注册ADSABS论文搜索工具...")
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "searchAdsabsPapers",
-		Description: "Search astronomy and astrophysics papers from ADSABS. Requires ADSABS_API_KEY environment variable. Supports bibcode, author, object, and advanced astronomical queries. Returns citation counts and astronomical object associations.",
-	}, searchAdsabsPapers)
-	log.Printf("[INFO] ADSABS论文搜索工具注册完成")
-
-	// 添加Sci-Hub论文搜索工具
-	log.Printf("[DEBUG] 正在注册Sci-Hub论文搜索工具...")
-	mcp.AddTool(server, &mcp.Tool{
-		Name:        "searchSciHubPapers",
-		Description: "Search and check PDF availability from Sci-Hub. Supports DOI, PMID, and title searches. Returns PDF download links when available. Note: Respects applicable laws and terms of service.",
-	}, searchSciHubPapers)
-	log.Printf("[INFO] Sci-Hub论文搜索工具注册完成")
+		Name:        "getScholarPaper",
+		Description: "Get detailed information of a specific academic paper by any identifier (DOI, arXiv ID, PubMed ID, Semantic Scholar ID, etc.). Automatically determines the best data source based on identifier type and retrieves comprehensive metadata including citations, abstracts, and external links.",
+	}, getScholarPaper)
+	log.Printf("[INFO] 学术论文详情获取工具注册完成")
 
 	// Create the streamable HTTP handler.
 	log.Printf("[DEBUG] 正在创建HTTP处理程序...")
@@ -896,32 +455,34 @@ func main() {
 	log.Printf("[DEBUG] 日志中间件已附加")
 
 	url := "http://127.0.0.1:8080/"
-	log.Printf("[INFO] 学术论文检索MCP服务器正在监听: %s", url)
-	log.Printf("[INFO] 可用的工具:")
-	log.Printf("[INFO]   📚 arXiv:")
-	log.Printf("[INFO]     - searchArxivPapers: 搜索arXiv论文")
-	log.Printf("[INFO]     - getArxivPaper: 获取特定arXiv论文详情")
-	log.Printf("[INFO]   🧠 Semantic Scholar:")
-	log.Printf("[INFO]     - searchSemanticScholarPapers: 搜索Semantic Scholar论文")
-	log.Printf("[INFO]     - getSemanticScholarPaper: 获取特定Semantic Scholar论文详情")
-	log.Printf("[INFO]   🔗 Crossref:")
-	log.Printf("[INFO]     - searchCrossrefPapers: 搜索Crossref论文")
-	log.Printf("[INFO]     - getCrossrefPaper: 获取特定Crossref论文详情")
-	log.Printf("[INFO]   📊 Scopus (需要API密钥):")
-	log.Printf("[INFO]     - searchScopusPapers: 搜索Scopus论文")
-	log.Printf("[INFO]   🌌 ADSABS (需要API密钥):")
-	log.Printf("[INFO]     - searchAdsabsPapers: 搜索天体物理学论文")
-	log.Printf("[INFO]   📄 Sci-Hub:")
-	log.Printf("[INFO]     - searchSciHubPapers: 搜索和获取PDF")
+	log.Printf("[INFO] 学术论文检索聚合MCP服务器正在监听: %s", url)
 	log.Printf("[INFO] ")
-	log.Printf("[INFO] 环境变量配置:")
-	log.Printf("[INFO]   - SCOPUS_API_KEY: Scopus API密钥 (可选)")
-	log.Printf("[INFO]   - ADSABS_API_KEY: ADSABS API密钥 (可选)")
+	log.Printf("[INFO] 🎯 统一工具接口:")
+	log.Printf("[INFO]   📚 searchScholarPapers - 聚合搜索学术论文")
+	log.Printf("[INFO]     ✨ 自动调用多个数据源 (arXiv, Semantic Scholar, Crossref等)")
+	log.Printf("[INFO]     ✨ 智能去重和结果合并")
+	log.Printf("[INFO]     ✨ 支持高级过滤和排序")
+	log.Printf("[INFO]   📄 getScholarPaper - 获取论文详情")
+	log.Printf("[INFO]     ✨ 支持多种标识符 (DOI, arXiv ID, PubMed ID等)")
+	log.Printf("[INFO]     ✨ 智能选择最佳数据源")
 	log.Printf("[INFO] ")
-	log.Printf("[INFO] 使用示例:")
-	log.Printf("[INFO]   arXiv搜索: {\"query\": \"machine learning\", \"max_results\": 5}")
-	log.Printf("[INFO]   DOI查询: {\"query\": \"10.1038/nature12373\"}")
-	log.Printf("[INFO]   多源搜索: 使用不同工具获取更全面的结果")
+	log.Printf("[INFO] 🔧 支持的数据源:")
+	log.Printf("[INFO]   📚 arXiv - 物理学、数学、计算机科学预印本")
+	log.Printf("[INFO]   🧠 Semantic Scholar - AI驱动的学术搜索")
+	log.Printf("[INFO]   🔗 Crossref - DOI注册机构，广泛的期刊覆盖")
+	log.Printf("[INFO]   📊 Scopus - Elsevier学术数据库 (需要API密钥)")
+	log.Printf("[INFO]   🌌 ADSABS - 天体物理学文献 (需要API密钥)")
+	log.Printf("[INFO]   📄 Sci-Hub - 论文PDF获取")
+	log.Printf("[INFO] ")
+	log.Printf("[INFO] 🔑 环境变量配置 (可选):")
+	log.Printf("[INFO]   - SCOPUS_API_KEY: Scopus API密钥")
+	log.Printf("[INFO]   - ADSABS_API_KEY: ADSABS API密钥")
+	log.Printf("[INFO]   - CROSSREF_EMAIL: Crossref礼貌邮箱")
+	log.Printf("[INFO] ")
+	log.Printf("[INFO] 💡 使用示例:")
+	log.Printf("[INFO]   基础搜索: {\"query\": \"machine learning\"}")
+	log.Printf("[INFO]   高级搜索: {\"query\": \"deep learning\", \"author\": \"Hinton\", \"year\": \"2020-2023\", \"min_citations\": 100}")
+	log.Printf("[INFO]   DOI查询: {\"identifier\": \"10.1038/nature12373\"}")
 
 	// Start the HTTP server with logging handler.
 	log.Printf("[INFO] ========== 服务器启动完成，等待连接 ==========")

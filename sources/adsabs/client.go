@@ -256,7 +256,7 @@ func (c *AdsabsClient) SearchPapersWithParams(ctx context.Context, params *Adsab
 	urlParams.Set("q", query)
 	urlParams.Set("start", strconv.Itoa(params.Start))
 	urlParams.Set("rows", strconv.Itoa(params.Rows))
-	
+
 	if params.Sort != "" {
 		urlParams.Set("sort", params.Sort)
 	} else {
