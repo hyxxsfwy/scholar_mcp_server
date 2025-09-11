@@ -1,4 +1,4 @@
-module mcp
+module github.com/Seelly/scholar_mcp_server
 
 go 1.24
 
