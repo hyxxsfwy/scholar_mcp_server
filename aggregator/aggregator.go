@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/Seelly/scholar_mcp_server/common"
-	
+	"github.com/Seelly/scholar_mcp_server/sources"
 )
 
 // ScholarAggregator 学术论文聚合器
@@ -22,13 +22,6 @@ type ScholarAggregator struct {
 func NewScholarAggregator() *ScholarAggregator {
 	return &ScholarAggregator{
 		sourceManager: sources.GetDefaultSourceManager(),
-	}
-}
-
-// NewScholarAggregatorWithManager 使用指定的数据源管理器创建聚合器
-func NewScholarAggregatorWithManager(manager *sources.SourceManager) *ScholarAggregator {
-	return &ScholarAggregator{
-		sourceManager: manager,
 	}
 }
 
