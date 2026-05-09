@@ -135,13 +135,13 @@ go run main.go logging.go
 
 ```bash
 # 编译二进制文件
-go build -o scholar-server main.go logging.go
+go build -o scholar_mcp_server .
 
 # 后台运行
-nohup ./scholar-server > server.log 2>&1 &
+nohup ./scholar_mcp_server --http > server.log 2>&1 &
 ```
 
-服务器将在 `http://0.0.0.0:8888/` 启动。
+服务器将在 `http://0.0.0.0:8899/` 启动。
 
 ## MCP 客户端配置
 
@@ -153,7 +153,7 @@ nohup ./scholar-server > server.log 2>&1 &
 {
   "mcpServers": {
     "arXiv论文检索服务": {
-      "url": "http://0.0.0.0:8888/mcp"
+      "url": "http://localhost:8899/"
     }
   }
 }
@@ -164,17 +164,18 @@ nohup ./scholar-server > server.log 2>&1 &
 ### 搜索论文
 ```bash
 # 使用 curl 测试搜索功能
-curl -X POST http://0.0.0.0:8888/mcp \
+curl -X POST http://localhost:8899/ \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -d '{
     "jsonrpc": "2.0",
     "id": 1,
     "method": "tools/call",
     "params": {
-      "name": "searchArxivPapers",
+      "name": "searchScholarPapers",
       "arguments": {
         "query": "deep learning",
-        "max_results": 5
+        "limit": 5
       }
     }
   }'
@@ -182,16 +183,17 @@ curl -X POST http://0.0.0.0:8888/mcp \
 
 ### 获取论文详情
 ```bash
-curl -X POST http://0.0.0.0:8888/mcp \
+curl -X POST http://localhost:8899/ \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -d '{
     "jsonrpc": "2.0",
     "id": 2,
     "method": "tools/call",
     "params": {
-      "name": "getArxivPaper",
+      "name": "getScholarPaper",
       "arguments": {
-        "id": "2301.07041"
+        "identifier": "2301.07041"
       }
     }
   }'

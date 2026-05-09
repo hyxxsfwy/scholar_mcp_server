@@ -294,7 +294,7 @@ func getScholarPaper(ctx context.Context, req *mcp.CallToolRequest, params *Scho
 
 func main() {
 	httpMode := flag.Bool("http", false, "Run as HTTP server instead of stdio transport")
-	port := flag.String("port", "8888", "HTTP server port (only used with --http)")
+	port := flag.String("port", "8899", "HTTP server port (only used with --http)")
 	flag.Parse()
 
 	if *httpMode {
@@ -341,54 +341,30 @@ func runHTTPServer(port string) {
 
 	server := createServer()
 
-	issuerURL := fmt.Sprintf("http://127.0.0.1:%s", port)
-	oauthSrv := NewOAuthServer(issuerURL)
-
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
 		log.Printf("[DEBUG] HTTP请求处理: %s %s", req.Method, req.URL.Path)
 		return server
-	}, nil)
+	}, &mcp.StreamableHTTPOptions{Stateless: true})
 
-	protectedMCP := oauthSrv.BearerMiddleware(mcpHandler)
-
-	rootHandler := loggingHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if isOAuthPath(r.URL.Path) {
-			oauthSrv.handler().ServeHTTP(w, r)
-		} else {
-			protectedMCP.ServeHTTP(w, r)
+	// VSCode probes /.well-known/oauth-protected-resource before sending MCP
+	// requests. If that path reaches the MCP handler it returns 400, which
+	// triggers VSCode's OAuth flow and blocks the connection. Return 404 here
+	// so VSCode skips OAuth and connects directly.
+	router := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/.well-known/") {
+			http.NotFound(w, r)
+			return
 		}
-	}))
+		mcpHandler.ServeHTTP(w, r)
+	})
 
-	log.Printf("[INFO] MCP服务端点: %s", issuerURL)
-	log.Printf("[INFO] OAuth授权服务器: %s", issuerURL)
-	log.Printf("[INFO] OAuth注册端点: %s/register", issuerURL)
-	log.Printf("[INFO] ")
-	log.Printf("[INFO] 统一工具接口:")
-	log.Printf("[INFO]   searchScholarPapers - 聚合搜索学术论文")
-	log.Printf("[INFO]   getScholarPaper - 获取论文详情")
-	log.Printf("[INFO] ")
-	log.Printf("[INFO] 支持的数据源:")
-	log.Printf("[INFO]   arXiv, Semantic Scholar, Crossref, Scopus, ADSABS, Sci-Hub")
-	log.Printf("[INFO] ")
-	log.Printf("[INFO] 使用示例:")
-	log.Printf("[INFO]   基础搜索: {\"query\": \"machine learning\"}")
-	log.Printf("[INFO]   DOI查询: {\"identifier\": \"10.1038/nature12373\"}")
+	rootHandler := loggingHandler(router)
 
+	log.Printf("[INFO] MCP服务端点: http://0.0.0.0:%s", port)
+	log.Printf("[INFO] 统一工具接口: searchScholarPapers, getScholarPaper")
+	log.Printf("[INFO] 支持的数据源: arXiv, Semantic Scholar, Crossref, Scopus, ADSABS, Sci-Hub")
 	log.Printf("[INFO] ========== 服务器启动完成，等待连接 ==========")
 	if err := http.ListenAndServe(":"+port, rootHandler); err != nil {
-		log.Printf("[FATAL] 服务器启动失败: %v", err)
-		log.Fatalf("Server failed: %v", err)
+		log.Fatalf("[FATAL] 服务器启动失败: %v", err)
 	}
-}
-
-func isOAuthPath(path string) bool {
-	switch path {
-	case "/.well-known/oauth-protected-resource",
-		"/.well-known/oauth-authorization-server",
-		"/register",
-		"/authorize",
-		"/token":
-		return true
-	}
-	return false
 }

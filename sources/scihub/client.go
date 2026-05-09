@@ -14,7 +14,7 @@ import (
 
 const (
 	// 注意：这些是示例镜像地址，实际使用时需要获取最新的可用镜像
-	DefaultSciHubMirror = "https://sci-hub.se"
+	DefaultSciHubMirror = "https://sci-hub.jp"
 	DefaultMaxResults   = 10
 	MaxMaxResults       = 50
 )
@@ -34,7 +34,7 @@ func NewSciHubClient() *SciHubClient {
 			Timeout: 30 * time.Second,
 		},
 		mirrors: []string{
-			"https://sci-hub.se",
+			"https://sci-hub.jp",
 			"https://sci-hub.st",
 			"https://sci-hub.ru",
 		},
