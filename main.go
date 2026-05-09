@@ -338,57 +338,57 @@ func runStdioServer() {
 
 func runHTTPServer(port string) {
 	log.Printf("[INFO] ========== 学术论文检索聚合MCP服务器启动 (HTTP) ==========")
-	log.Printf("[INFO] 正在初始化统一学术论文检索MCP服务器...")
 
 	server := createServer()
-	log.Printf("[DEBUG] MCP服务器创建完成，名称: %s, 版本: %s", "scholar-aggregator-mcp-server", "2.0.0")
 
-	log.Printf("[INFO] 统一学术论文搜索工具注册完成")
-	log.Printf("[INFO] 学术论文详情获取工具注册完成")
+	issuerURL := fmt.Sprintf("http://127.0.0.1:%s", port)
+	oauthSrv := NewOAuthServer(issuerURL)
 
-	log.Printf("[DEBUG] 正在创建HTTP处理程序...")
-	handler := mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
+	mcpHandler := mcp.NewStreamableHTTPHandler(func(req *http.Request) *mcp.Server {
 		log.Printf("[DEBUG] HTTP请求处理: %s %s", req.Method, req.URL.Path)
 		return server
 	}, nil)
-	log.Printf("[INFO] HTTP处理程序创建完成")
 
-	handlerWithLogging := loggingHandler(handler)
-	log.Printf("[DEBUG] 日志中间件已附加")
+	protectedMCP := oauthSrv.BearerMiddleware(mcpHandler)
 
-	url := fmt.Sprintf("http://0.0.0.0:%s/", port)
-	log.Printf("[INFO] 学术论文检索聚合MCP服务器正在监听: %s", url)
+	rootHandler := loggingHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isOAuthPath(r.URL.Path) {
+			oauthSrv.handler().ServeHTTP(w, r)
+		} else {
+			protectedMCP.ServeHTTP(w, r)
+		}
+	}))
+
+	log.Printf("[INFO] MCP服务端点: %s", issuerURL)
+	log.Printf("[INFO] OAuth授权服务器: %s", issuerURL)
+	log.Printf("[INFO] OAuth注册端点: %s/register", issuerURL)
 	log.Printf("[INFO] ")
 	log.Printf("[INFO] 统一工具接口:")
 	log.Printf("[INFO]   searchScholarPapers - 聚合搜索学术论文")
-	log.Printf("[INFO]     - 自动调用多个数据源 (arXiv, Semantic Scholar, Crossref等)")
-	log.Printf("[INFO]     - 智能去重和结果合并")
-	log.Printf("[INFO]     - 支持高级过滤和排序")
 	log.Printf("[INFO]   getScholarPaper - 获取论文详情")
-	log.Printf("[INFO]     - 支持多种标识符 (DOI, arXiv ID, PubMed ID等)")
-	log.Printf("[INFO]     - 智能选择最佳数据源")
 	log.Printf("[INFO] ")
 	log.Printf("[INFO] 支持的数据源:")
-	log.Printf("[INFO]   arXiv - 物理学、数学、计算机科学预印本")
-	log.Printf("[INFO]   Semantic Scholar - AI驱动的学术搜索")
-	log.Printf("[INFO]   Crossref - DOI注册机构，广泛的期刊覆盖")
-	log.Printf("[INFO]   Scopus - Elsevier学术数据库 (需要API密钥)")
-	log.Printf("[INFO]   ADSABS - 天体物理学文献 (需要API密钥)")
-	log.Printf("[INFO]   Sci-Hub - 论文PDF获取")
-	log.Printf("[INFO] ")
-	log.Printf("[INFO] 环境变量配置 (可选):")
-	log.Printf("[INFO]   - SCOPUS_API_KEY: Scopus API密钥")
-	log.Printf("[INFO]   - ADSABS_API_KEY: ADSABS API密钥")
-	log.Printf("[INFO]   - CROSSREF_EMAIL: Crossref礼貌邮箱")
+	log.Printf("[INFO]   arXiv, Semantic Scholar, Crossref, Scopus, ADSABS, Sci-Hub")
 	log.Printf("[INFO] ")
 	log.Printf("[INFO] 使用示例:")
 	log.Printf("[INFO]   基础搜索: {\"query\": \"machine learning\"}")
-	log.Printf("[INFO]   高级搜索: {\"query\": \"deep learning\", \"author\": \"Hinton\", \"year\": \"2020-2023\", \"min_citations\": 100}")
 	log.Printf("[INFO]   DOI查询: {\"identifier\": \"10.1038/nature12373\"}")
 
 	log.Printf("[INFO] ========== 服务器启动完成，等待连接 ==========")
-	if err := http.ListenAndServe(":"+port, handlerWithLogging); err != nil {
+	if err := http.ListenAndServe(":"+port, rootHandler); err != nil {
 		log.Printf("[FATAL] 服务器启动失败: %v", err)
 		log.Fatalf("Server failed: %v", err)
 	}
+}
+
+func isOAuthPath(path string) bool {
+	switch path {
+	case "/.well-known/oauth-protected-resource",
+		"/.well-known/oauth-authorization-server",
+		"/register",
+		"/authorize",
+		"/token":
+		return true
+	}
+	return false
 }
