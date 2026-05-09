@@ -141,7 +141,7 @@ go build -o scholar-server main.go logging.go
 nohup ./scholar-server > server.log 2>&1 &
 ```
 
-服务器将在 `http://127.0.0.1:8080/` 启动。
+服务器将在 `http://0.0.0.0:8888/` 启动。
 
 ## MCP 客户端配置
 
@@ -153,7 +153,7 @@ nohup ./scholar-server > server.log 2>&1 &
 {
   "mcpServers": {
     "arXiv论文检索服务": {
-      "url": "http://127.0.0.1:8080/mcp"
+      "url": "http://0.0.0.0:8888/mcp"
     }
   }
 }
@@ -164,7 +164,7 @@ nohup ./scholar-server > server.log 2>&1 &
 ### 搜索论文
 ```bash
 # 使用 curl 测试搜索功能
-curl -X POST http://127.0.0.1:8080/mcp \
+curl -X POST http://0.0.0.0:8888/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",
@@ -182,7 +182,7 @@ curl -X POST http://127.0.0.1:8080/mcp \
 
 ### 获取论文详情
 ```bash
-curl -X POST http://127.0.0.1:8080/mcp \
+curl -X POST http://0.0.0.0:8888/mcp \
   -H "Content-Type: application/json" \
   -d '{
     "jsonrpc": "2.0",

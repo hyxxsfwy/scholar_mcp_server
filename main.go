@@ -327,7 +327,7 @@ func main() {
 	handlerWithLogging := loggingHandler(handler)
 	log.Printf("[DEBUG] 日志中间件已附加")
 
-	url := "http://127.0.0.1:8080/"
+	url := "http://0.0.0.0:8888/"
 	log.Printf("[INFO] 学术论文检索聚合MCP服务器正在监听: %s", url)
 	log.Printf("[INFO] ")
 	log.Printf("[INFO] 🎯 统一工具接口:")
@@ -359,7 +359,7 @@ func main() {
 
 	// Start the HTTP server with logging handler.
 	log.Printf("[INFO] ========== 服务器启动完成，等待连接 ==========")
-	if err := http.ListenAndServe(":8080", handlerWithLogging); err != nil {
+	if err := http.ListenAndServe(":8888", handlerWithLogging); err != nil {
 		log.Printf("[FATAL] 服务器启动失败: %v", err)
 		log.Fatalf("Server failed: %v", err)
 	}
