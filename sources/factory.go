@@ -56,6 +56,12 @@ func (sf *SourceFactory) InitializeAllSources() *SourceManager {
 		}
 	}
 
+	// 注册Google Scholar数据源 (SerpAPI兼容接口)
+	if configs["google_scholar"].Enabled && configs["google_scholar"].APIKey != "" {
+		googleScholarSource := NewGoogleScholarSource(configs["google_scholar"])
+		sf.manager.RegisterSource("google_scholar", googleScholarSource, configs["google_scholar"])
+	}
+
 	// 注册Sci-Hub数据源
 	if configs["scihub"].Enabled {
 		scihubSource := NewSciHubSource(configs["scihub"])
@@ -125,6 +131,16 @@ func (sf *SourceFactory) loadConfigsFromEnv() map[string]SourceConfig {
 		RateLimit:      defaultRateLimit,
 	}
 
+	// Google Scholar配置 (通过SerpAPI兼容接口)
+	configs["google_scholar"] = SourceConfig{
+		APIKey:         firstEnvValue("SERPAPI_API_KEY", "GOOGLE_SCHOLAR_API_KEY"),
+		BaseURL:        firstEnvValue("SERPAPI_BASE_URL", "GOOGLE_SCHOLAR_BASE_URL"),
+		Enabled:        getBoolEnv("ENABLE_GOOGLE_SCHOLAR", false), // 默认关闭，需要第三方SERP API密钥
+		RequestTimeout: defaultTimeout,
+		MaxRetries:     defaultRetries,
+		RateLimit:      2,
+	}
+
 	// Sci-Hub配置
 	configs["scihub"] = SourceConfig{
 		Enabled:        getBoolEnv("ENABLE_SCIHUB", true),
@@ -144,6 +160,16 @@ func getBoolEnv(key string, defaultValue bool) bool {
 		}
 	}
 	return defaultValue
+}
+
+func firstEnvValue(keys ...string) string {
+	for _, key := range keys {
+		if value := os.Getenv(key); value != "" {
+			return value
+		}
+	}
+
+	return ""
 }
 
 // GetDefaultSourceManager 获取默认配置的数据源管理器

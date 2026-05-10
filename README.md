@@ -4,7 +4,7 @@
 
 ## 功能特性
 
-- 🔍 **多源聚合搜索**: 同时调用6个主要学术数据库
+- 🔍 **多源聚合搜索**: 同时调用多个主要学术数据库
 - 🧠 **智能去重合并**: 基于DOI和标题的智能重复检测
 - 📊 **统一数据格式**: 标准化的论文元数据结构
 - 🚀 **并发高性能**: 异步并行调用所有数据源
@@ -19,6 +19,7 @@
 - **Crossref**: 全球最大的DOI注册机构 (免费)
 - **Scopus**: Elsevier学术数据库 (需要API密钥)
 - **ADSABS**: NASA天体物理学数据系统 (需要API密钥)
+- **Google Scholar**: 通过 SerpAPI 兼容第三方 SERP API 接入 (需要API密钥，默认关闭)
 - **Sci-Hub**: 学术论文PDF获取 (免费，但需注意法律风险)
 
 ## 可用工具
@@ -126,6 +127,12 @@ go run main.go logging.go
 # 设置API密钥
 export SCOPUS_API_KEY="your_scopus_api_key"
 export ADSABS_API_KEY="your_adsabs_api_key"
+
+# 可选：启用 Google Scholar (SerpAPI 兼容接口)
+export ENABLE_GOOGLE_SCHOLAR=true
+export SERPAPI_API_KEY="your_serpapi_api_key"
+# 可选：使用自建或兼容网关
+# export SERPAPI_BASE_URL="https://serpapi.com/search.json"
 
 # 运行服务器
 go run main.go logging.go

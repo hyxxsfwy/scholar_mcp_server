@@ -7,6 +7,7 @@ import (
 	"github.com/Seelly/scholar_mcp_server/common"
 	"github.com/Seelly/scholar_mcp_server/sources/adsabs"
 	"github.com/Seelly/scholar_mcp_server/sources/crossref"
+	"github.com/Seelly/scholar_mcp_server/sources/googlescholar"
 	"github.com/Seelly/scholar_mcp_server/sources/scopus"
 	"github.com/Seelly/scholar_mcp_server/sources/semanticscholar"
 )
@@ -35,6 +36,11 @@ func hasAdsabsStructuredFilters(params common.SearchParams) bool {
 func hasArxivStructuredFilters(params common.SearchParams) bool {
 	return params.Title != "" || params.Author != "" || params.Abstract != "" ||
 		params.Journal != "" || len(params.Categories) > 0
+}
+
+func hasGoogleScholarStructuredFilters(params common.SearchParams) bool {
+	return params.Title != "" || params.Author != "" || params.Abstract != "" ||
+		params.Journal != "" || params.Year != "" || params.YearRange != "" || len(params.Categories) > 0
 }
 
 func buildCrossrefSearchParam(params common.SearchParams) *crossref.CrossrefSearchParam {
@@ -100,6 +106,44 @@ func buildAdsabsSearchParam(params common.SearchParams) *adsabs.AdsabsSearchPara
 	}
 
 	return searchParams
+}
+
+func buildGoogleScholarSearchParam(params common.SearchParams) *googlescholar.GoogleScholarSearchParam {
+	return &googlescholar.GoogleScholarSearchParam{
+		Query:     buildGoogleScholarQuery(params),
+		Author:    params.Author,
+		Journal:   params.Journal,
+		Year:      params.Year,
+		YearRange: params.YearRange,
+		Offset:    params.Offset,
+		Limit:     params.Limit,
+		SortBy:    params.SortBy,
+		SortOrder: params.SortOrder,
+	}
+}
+
+func buildGoogleScholarQuery(params common.SearchParams) string {
+	var clauses []string
+	derivedQuery := common.DeriveSearchQuery(params)
+
+	if params.Query != "" && (!hasGoogleScholarStructuredFilters(params) || params.Query != derivedQuery) {
+		clauses = append(clauses, params.Query)
+	}
+	if params.Title != "" {
+		clauses = append(clauses, fmt.Sprintf("intitle:%q", params.Title))
+	}
+	if params.Abstract != "" {
+		clauses = append(clauses, params.Abstract)
+	}
+	if len(params.Categories) > 0 {
+		clauses = append(clauses, strings.Join(params.Categories, " "))
+	}
+
+	if len(clauses) == 0 {
+		return firstNonEmpty(params.Query, derivedQuery)
+	}
+
+	return strings.Join(clauses, " ")
 }
 
 func buildArxivSearchQuery(params common.SearchParams) string {

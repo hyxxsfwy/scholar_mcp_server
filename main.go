@@ -64,7 +64,7 @@ func createServer() *mcp.Server {
 
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "searchScholarPapers",
-		Description: "Search academic papers from multiple sources simultaneously (arXiv, Semantic Scholar, Crossref, Scopus, ADSABS, Sci-Hub). Automatically aggregates, deduplicates, and ranks results. Supports advanced filtering by author, journal, year, citations, and open access status. Returns unified paper metadata with source attribution.",
+		Description: "Search academic papers from multiple sources simultaneously (arXiv, Semantic Scholar, Crossref, Scopus, ADSABS, optional Google Scholar via SerpAPI, Sci-Hub). Automatically aggregates, deduplicates, and ranks results. Supports advanced filtering by author, journal, year, citations, and open access status. Returns unified paper metadata with source attribution.",
 	}, searchScholarPapers)
 
 	mcp.AddTool(server, &mcp.Tool{
@@ -124,7 +124,7 @@ func runHTTPServer(port string) {
 
 	log.Printf("[INFO] MCP服务端点: http://0.0.0.0:%s", port)
 	log.Printf("[INFO] 统一工具接口: searchScholarPapers, getScholarPaper, fetchFromSciHub, sciHubPDFToMarkdown")
-	log.Printf("[INFO] 支持的数据源: arXiv, Semantic Scholar, Crossref, Scopus, ADSABS, Sci-Hub")
+	log.Printf("[INFO] 支持的数据源: arXiv, Semantic Scholar, Crossref, Scopus, ADSABS, Google Scholar(SerpAPI), Sci-Hub")
 	log.Printf("[INFO] ========== 服务器启动完成，等待连接 ==========")
 	if err := http.ListenAndServe(":"+port, rootHandler); err != nil {
 		log.Fatalf("[FATAL] 服务器启动失败: %v", err)

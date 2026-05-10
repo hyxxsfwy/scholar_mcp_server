@@ -128,6 +128,44 @@ func TestBuildAdsabsSearchParam(t *testing.T) {
 	}
 }
 
+func TestBuildGoogleScholarSearchParam(t *testing.T) {
+	params := common.SearchParams{
+		Query:      "machine learning",
+		Title:      "Empirical Asset Pricing",
+		Author:     "Shihao Gu",
+		Journal:    "Review of Financial Studies",
+		Categories: []string{"Finance", "Asset Pricing"},
+		YearRange:  "2020-2023",
+		Offset:     4,
+		Limit:      8,
+		SortBy:     "published_date",
+		SortOrder:  "desc",
+	}
+
+	searchParams := buildGoogleScholarSearchParam(params)
+	if searchParams.Query != `machine learning intitle:"Empirical Asset Pricing" Finance Asset Pricing` {
+		t.Fatalf("expected Google Scholar query to preserve explicit and structured terms, got %q", searchParams.Query)
+	}
+	if searchParams.Author != params.Author || searchParams.Journal != params.Journal || searchParams.YearRange != params.YearRange {
+		t.Fatalf("expected structured filters to be preserved: %+v", searchParams)
+	}
+	if searchParams.Offset != 4 || searchParams.Limit != 8 || searchParams.SortBy != "published_date" {
+		t.Fatalf("expected paging and sort to be preserved: %+v", searchParams)
+	}
+}
+
+func TestBuildGoogleScholarSearchParamDerivesQueryForAuthorOnly(t *testing.T) {
+	params := common.SearchParams{Author: "Harry Markowitz", Limit: 5}
+
+	searchParams := buildGoogleScholarSearchParam(params)
+	if searchParams.Query != "Harry Markowitz" {
+		t.Fatalf("expected author-only query to be derived, got %q", searchParams.Query)
+	}
+	if searchParams.Author != "Harry Markowitz" {
+		t.Fatalf("expected author filter to be preserved, got %q", searchParams.Author)
+	}
+}
+
 func TestBuildArxivSearchQuery(t *testing.T) {
 	t.Run("uses fielded clauses for structured filters", func(t *testing.T) {
 		params := common.SearchParams{
