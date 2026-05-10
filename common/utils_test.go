@@ -6,13 +6,14 @@ import (
 
 func TestValidateSearchParams(t *testing.T) {
 	tests := []struct {
-		name    string
-		params  SearchParams
-		wantErr bool
+		name     string
+		params   SearchParams
+		wantErr  bool
 		errField string
 	}{
 		{"valid", SearchParams{Query: "machine learning"}, false, ""},
-		{"empty query", SearchParams{Query: ""}, true, "query"},
+		{"title only", SearchParams{Title: "Portfolio Selection"}, false, ""},
+		{"empty search", SearchParams{}, true, "query"},
 		{"negative offset", SearchParams{Query: "test", Offset: -1}, true, "offset"},
 		{"negative limit", SearchParams{Query: "test", Limit: -1}, true, "limit"},
 		{"limit too large", SearchParams{Query: "test", Limit: 1001}, true, "limit"},
@@ -72,6 +73,14 @@ func TestNormalizeSearchParams(t *testing.T) {
 		}
 		if p.SortOrder != "desc" {
 			t.Errorf("expected default sort order desc, got %s", p.SortOrder)
+		}
+	})
+
+	t.Run("derives query from structured fields", func(t *testing.T) {
+		p := SearchParams{Title: "  Portfolio   Selection  ", Author: " Harry   Markowitz "}
+		NormalizeSearchParams(&p)
+		if p.Query != "Portfolio Selection Harry Markowitz" {
+			t.Errorf("expected derived query, got %q", p.Query)
 		}
 	})
 }

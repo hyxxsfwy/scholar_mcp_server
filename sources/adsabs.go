@@ -3,6 +3,7 @@ package sources
 import (
 	"context"
 	"fmt"
+
 	"github.com/Seelly/scholar_mcp_server/sources/adsabs"
 
 	"github.com/Seelly/scholar_mcp_server/common"
@@ -37,7 +38,16 @@ func (a *AdsabsSource) SearchPapers(ctx context.Context, params common.SearchPar
 		return nil, 0, fmt.Errorf("ADSABS client not initialized - API key required")
 	}
 
-	result, err := a.client.SearchPapers(ctx, params.Query, params.Offset, params.Limit)
+	var (
+		result *adsabs.SearchResult
+		err    error
+	)
+
+	if hasAdsabsStructuredFilters(params) {
+		result, err = a.client.SearchPapersWithParams(ctx, buildAdsabsSearchParam(params))
+	} else {
+		result, err = a.client.SearchPapers(ctx, params.Query, params.Offset, params.Limit)
+	}
 	if err != nil {
 		return nil, 0, err
 	}

@@ -70,26 +70,7 @@ func (h *UnifiedMCPHandler) SearchScholarPapers(ctx context.Context, req *mcp.Ca
 	log.Printf("[DEBUG] ========== 开始聚合搜索学术论文 ==========")
 	log.Printf("[DEBUG] 接收到的原始参数: %+v", params)
 
-	// 设置默认值
-	if params.Offset < 0 {
-		params.Offset = 0
-	}
-	if params.Limit <= 0 {
-		params.Limit = 10
-	}
-	if params.Limit > 100 {
-		params.Limit = 100
-	}
-
-	// 验证查询参数
-	if strings.TrimSpace(params.Query) == "" {
-		log.Printf("[ERROR] 搜索关键词为空，终止请求")
-		return nil, nil, fmt.Errorf("搜索关键词不能为空")
-	}
-
-	log.Printf("[INFO] 开始聚合搜索: 关键词='%s', Offset=%d, Limit=%d", params.Query, params.Offset, params.Limit)
-
-	// 转换为通用搜索参数
+	// 转换为通用搜索参数并标准化
 	searchParams := common.SearchParams{
 		Query:          params.Query,
 		Author:         params.Author,
@@ -104,6 +85,25 @@ func (h *UnifiedMCPHandler) SearchScholarPapers(ctx context.Context, req *mcp.Ca
 		SortBy:         params.SortBy,
 		SortOrder:      params.SortOrder,
 	}
+	common.NormalizeSearchParams(&searchParams)
+
+	// 设置默认值
+	if searchParams.Limit > 100 {
+		searchParams.Limit = 100
+	}
+
+	// 同步标准化后的显示参数
+	params.Query = searchParams.Query
+	params.Offset = searchParams.Offset
+	params.Limit = searchParams.Limit
+
+	// 验证搜索条件
+	if !common.HasSearchTerms(searchParams) {
+		log.Printf("[ERROR] 搜索条件为空，终止请求")
+		return nil, nil, fmt.Errorf("搜索条件不能为空，至少填写一个搜索词或筛选字段")
+	}
+
+	log.Printf("[INFO] 开始聚合搜索: 关键词='%s', Offset=%d, Limit=%d", searchParams.Query, searchParams.Offset, searchParams.Limit)
 
 	// 如果指定了启用的数据源，需要临时调整聚合器
 	var originalManager *SourceManager
@@ -191,20 +191,6 @@ func (h *UnifiedMCPHandler) SearchSourcePapers(ctx context.Context, req *mcp.Cal
 	if strings.TrimSpace(params.Source) == "" {
 		return nil, nil, fmt.Errorf("数据源名称不能为空")
 	}
-	if strings.TrimSpace(params.Query) == "" {
-		return nil, nil, fmt.Errorf("搜索关键词不能为空")
-	}
-
-	// 设置默认值
-	if params.Offset < 0 {
-		params.Offset = 0
-	}
-	if params.Limit <= 0 {
-		params.Limit = 10
-	}
-	if params.Limit > 100 {
-		params.Limit = 100
-	}
 
 	// 获取指定的数据源
 	source, exists := h.aggregator.sourceManager.GetSource(params.Source)
@@ -227,8 +213,19 @@ func (h *UnifiedMCPHandler) SearchSourcePapers(ctx context.Context, req *mcp.Cal
 		SortBy:         params.SortBy,
 		SortOrder:      params.SortOrder,
 	}
+	common.NormalizeSearchParams(&searchParams)
+	if searchParams.Limit > 100 {
+		searchParams.Limit = 100
+	}
+	if !common.HasSearchTerms(searchParams) {
+		return nil, nil, fmt.Errorf("搜索条件不能为空，至少填写一个搜索词或筛选字段")
+	}
 
-	log.Printf("[INFO] 开始单个数据源搜索: 源='%s', 关键词='%s'", params.Source, params.Query)
+	params.Query = searchParams.Query
+	params.Offset = searchParams.Offset
+	params.Limit = searchParams.Limit
+
+	log.Printf("[INFO] 开始单个数据源搜索: 源='%s', 关键词='%s'", params.Source, searchParams.Query)
 
 	// 执行搜索
 	startTime := time.Now()
@@ -246,7 +243,7 @@ func (h *UnifiedMCPHandler) SearchSourcePapers(ctx context.Context, req *mcp.Cal
 	// 创建结果结构
 	result := map[string]interface{}{
 		"source":      params.Source,
-		"query":       params.Query,
+		"query":       searchParams.Query,
 		"total":       total,
 		"count":       len(papers),
 		"search_time": searchTime.Milliseconds(),

@@ -2,6 +2,7 @@ package sources
 
 import (
 	"context"
+
 	"github.com/Seelly/scholar_mcp_server/sources/crossref"
 
 	"github.com/Seelly/scholar_mcp_server/common"
@@ -35,7 +36,16 @@ func (c *CrossrefSource) GetSourceName() string {
 
 // SearchPapers 搜索论文
 func (c *CrossrefSource) SearchPapers(ctx context.Context, params common.SearchParams) ([]common.UnifiedPaper, int, error) {
-	result, err := c.client.SearchPapers(ctx, params.Query, params.Offset, params.Limit)
+	var (
+		result *crossref.SearchResult
+		err    error
+	)
+
+	if hasCrossrefStructuredFilters(params) {
+		result, err = c.client.SearchPapersWithParams(ctx, buildCrossrefSearchParam(params))
+	} else {
+		result, err = c.client.SearchPapers(ctx, params.Query, params.Offset, params.Limit)
+	}
 	if err != nil {
 		return nil, 0, err
 	}

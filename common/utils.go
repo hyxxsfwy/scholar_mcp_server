@@ -8,15 +8,30 @@ import (
 	"time"
 )
 
+// HasSearchTerms 检查是否至少提供了一个可搜索字段
+func HasSearchTerms(params SearchParams) bool {
+	return len(searchTermsFromParams(params, true)) > 0
+}
+
+// DeriveSearchQuery 从结构化搜索字段推导基础查询词
+func DeriveSearchQuery(params SearchParams) string {
+	terms := searchTermsFromParams(params, false)
+	if len(terms) == 0 {
+		return ""
+	}
+
+	return strings.Join(terms, " ")
+}
+
 // ValidateSearchParams 验证搜索参数
 func ValidateSearchParams(params SearchParams) *ValidationResult {
 	var errors []ValidationError
 
-	// 验证查询关键词
-	if strings.TrimSpace(params.Query) == "" {
+	// 验证至少提供一个可搜索字段
+	if !HasSearchTerms(params) {
 		errors = append(errors, ValidationError{
 			Field:   "query",
-			Message: "查询关键词不能为空",
+			Message: "至少需要提供一个搜索词或筛选字段",
 			Value:   params.Query,
 		})
 	}
@@ -81,8 +96,22 @@ func ValidateSearchParams(params SearchParams) *ValidationResult {
 
 // NormalizeSearchParams 标准化搜索参数
 func NormalizeSearchParams(params *SearchParams) {
-	// 清理查询关键词
-	params.Query = strings.TrimSpace(params.Query)
+	// 清理字符串字段
+	params.Query = normalizeSearchTerm(params.Query)
+	params.Author = normalizeSearchTerm(params.Author)
+	params.Title = normalizeSearchTerm(params.Title)
+	params.Abstract = normalizeSearchTerm(params.Abstract)
+	params.Journal = normalizeSearchTerm(params.Journal)
+	params.Publisher = normalizeSearchTerm(params.Publisher)
+	params.Year = strings.TrimSpace(params.Year)
+	params.YearRange = strings.TrimSpace(params.YearRange)
+	params.Language = normalizeSearchTerm(params.Language)
+	params.Type = normalizeSearchTerm(params.Type)
+	params.Categories = normalizeSearchTerms(params.Categories)
+
+	if params.Query == "" {
+		params.Query = DeriveSearchQuery(*params)
+	}
 
 	// 设置默认值
 	if params.Limit <= 0 {
@@ -102,15 +131,61 @@ func NormalizeSearchParams(params *SearchParams) {
 	if params.SortOrder == "" {
 		params.SortOrder = "desc"
 	}
+}
 
-	// 清理字符串字段
-	params.Author = strings.TrimSpace(params.Author)
-	params.Title = strings.TrimSpace(params.Title)
-	params.Abstract = strings.TrimSpace(params.Abstract)
-	params.Journal = strings.TrimSpace(params.Journal)
-	params.Publisher = strings.TrimSpace(params.Publisher)
-	params.Language = strings.TrimSpace(params.Language)
-	params.Type = strings.TrimSpace(params.Type)
+func searchTermsFromParams(params SearchParams, includeQuery bool) []string {
+	var terms []string
+	seen := make(map[string]struct{})
+
+	addTerm := func(term string) {
+		term = normalizeSearchTerm(term)
+		if term == "" {
+			return
+		}
+		if _, exists := seen[term]; exists {
+			return
+		}
+		seen[term] = struct{}{}
+		terms = append(terms, term)
+	}
+
+	if includeQuery {
+		addTerm(params.Query)
+	}
+	addTerm(params.Title)
+	addTerm(params.Author)
+	addTerm(params.Abstract)
+	addTerm(params.Journal)
+	addTerm(params.Publisher)
+	for _, category := range params.Categories {
+		addTerm(category)
+	}
+
+	return terms
+}
+
+func normalizeSearchTerms(terms []string) []string {
+	if len(terms) == 0 {
+		return nil
+	}
+
+	cleaned := make([]string, 0, len(terms))
+	for _, term := range terms {
+		term = normalizeSearchTerm(term)
+		if term != "" {
+			cleaned = append(cleaned, term)
+		}
+	}
+
+	if len(cleaned) == 0 {
+		return nil
+	}
+
+	return cleaned
+}
+
+func normalizeSearchTerm(term string) string {
+	return strings.Join(strings.Fields(strings.TrimSpace(term)), " ")
 }
 
 // ExtractDOI 从文本中提取DOI
@@ -136,7 +211,7 @@ func IsArxivID(s string) bool {
 	newPattern := regexp.MustCompile(`^\d{4}\.\d{4,5}(v\d+)?$`)
 	// 旧格式: subject-class/YYMMnnn
 	oldPattern := regexp.MustCompile(`^[a-z-]+/\d{7}$`)
-	
+
 	return newPattern.MatchString(s) || oldPattern.MatchString(s)
 }
 
@@ -181,11 +256,11 @@ func SanitizeQuery(query string) string {
 	// 移除特殊字符，保留字母、数字、空格和一些常用符号
 	reg := regexp.MustCompile(`[^\w\s\-\+\(\)\[\]"':.,?!]`)
 	cleaned := reg.ReplaceAllString(query, " ")
-	
+
 	// 压缩多个空格为一个
 	spaceReg := regexp.MustCompile(`\s+`)
 	cleaned = spaceReg.ReplaceAllString(cleaned, " ")
-	
+
 	return strings.TrimSpace(cleaned)
 }
 
@@ -197,7 +272,7 @@ func SplitAuthors(authorsStr string) []string {
 
 	// 尝试不同的分隔符
 	separators := []string{";", ",", " and ", " & "}
-	
+
 	for _, sep := range separators {
 		if strings.Contains(authorsStr, sep) {
 			parts := strings.Split(authorsStr, sep)
@@ -229,7 +304,7 @@ func FormatAuthors(authors []string) string {
 	if len(authors) == 2 {
 		return authors[0] + " and " + authors[1]
 	}
-	
+
 	// 超过2个作者时
 	result := strings.Join(authors[:len(authors)-1], ", ")
 	result += ", and " + authors[len(authors)-1]
@@ -241,11 +316,11 @@ func TruncateText(text string, maxLength int) string {
 	if len(text) <= maxLength {
 		return text
 	}
-	
+
 	if maxLength <= 3 {
 		return text[:maxLength]
 	}
-	
+
 	return text[:maxLength-3] + "..."
 }
 
@@ -254,7 +329,7 @@ func ExtractKeywords(text string, maxKeywords int) []string {
 	// 简单的关键词提取，基于词频
 	words := strings.Fields(strings.ToLower(text))
 	wordCount := make(map[string]int)
-	
+
 	// 停用词列表
 	stopWords := map[string]bool{
 		"the": true, "a": true, "an": true, "and": true, "or": true,
@@ -268,7 +343,7 @@ func ExtractKeywords(text string, maxKeywords int) []string {
 		"it": true, "its": true, "our": true, "their": true, "from": true,
 		"into": true, "during": true, "before": true, "after": true,
 	}
-	
+
 	// 计算词频
 	for _, word := range words {
 		// 清理标点符号
@@ -277,18 +352,18 @@ func ExtractKeywords(text string, maxKeywords int) []string {
 			wordCount[word]++
 		}
 	}
-	
+
 	// 按频率排序
 	type wordFreq struct {
 		word  string
 		count int
 	}
-	
+
 	var sorted []wordFreq
 	for word, count := range wordCount {
 		sorted = append(sorted, wordFreq{word, count})
 	}
-	
+
 	// 简单排序（冒泡排序）
 	for i := 0; i < len(sorted)-1; i++ {
 		for j := 0; j < len(sorted)-i-1; j++ {
@@ -297,27 +372,27 @@ func ExtractKeywords(text string, maxKeywords int) []string {
 			}
 		}
 	}
-	
+
 	// 提取前N个关键词
 	var keywords []string
 	limit := maxKeywords
 	if len(sorted) < limit {
 		limit = len(sorted)
 	}
-	
+
 	for i := 0; i < limit; i++ {
 		keywords = append(keywords, sorted[i].word)
 	}
-	
+
 	return keywords
 }
 
 // GenerateSearchSuggestions 生成搜索建议
 func GenerateSearchSuggestions(query string) []SearchHint {
 	var suggestions []SearchHint
-	
+
 	query = strings.TrimSpace(strings.ToLower(query))
-	
+
 	// 如果查询看起来像DOI
 	if IsDOI(query) {
 		suggestions = append(suggestions, SearchHint{
@@ -327,7 +402,7 @@ func GenerateSearchSuggestions(query string) []SearchHint {
 			Description: "这看起来是一个DOI，建议使用精确搜索",
 		})
 	}
-	
+
 	// 如果查询看起来像arXiv ID
 	if IsArxivID(query) {
 		suggestions = append(suggestions, SearchHint{
@@ -337,7 +412,7 @@ func GenerateSearchSuggestions(query string) []SearchHint {
 			Description: "这看起来是一个arXiv ID",
 		})
 	}
-	
+
 	// 如果查询看起来像PubMed ID
 	if IsPubMedID(query) {
 		suggestions = append(suggestions, SearchHint{
@@ -347,7 +422,7 @@ func GenerateSearchSuggestions(query string) []SearchHint {
 			Description: "这看起来是一个PubMed ID",
 		})
 	}
-	
+
 	// 添加一些通用的搜索建议
 	if len(query) > 0 {
 		// 标题搜索建议
@@ -357,7 +432,7 @@ func GenerateSearchSuggestions(query string) []SearchHint {
 			Confidence:  0.7,
 			Description: "在标题中搜索",
 		})
-		
+
 		// 作者搜索建议
 		suggestions = append(suggestions, SearchHint{
 			Query:       fmt.Sprintf("author:\"%s\"", query),
@@ -365,7 +440,7 @@ func GenerateSearchSuggestions(query string) []SearchHint {
 			Confidence:  0.6,
 			Description: "在作者中搜索",
 		})
-		
+
 		// 摘要搜索建议
 		suggestions = append(suggestions, SearchHint{
 			Query:       fmt.Sprintf("abstract:\"%s\"", query),
@@ -374,7 +449,7 @@ func GenerateSearchSuggestions(query string) []SearchHint {
 			Description: "在摘要中搜索",
 		})
 	}
-	
+
 	return suggestions
 }
 

@@ -2,8 +2,9 @@ package sources
 
 import (
 	"context"
-	"github.com/Seelly/scholar_mcp_server/sources/semanticscholar"
 	"strconv"
+
+	"github.com/Seelly/scholar_mcp_server/sources/semanticscholar"
 
 	"github.com/Seelly/scholar_mcp_server/common"
 )
@@ -36,7 +37,16 @@ func (s *SemanticScholarSource) GetSourceName() string {
 
 // SearchPapers 搜索论文
 func (s *SemanticScholarSource) SearchPapers(ctx context.Context, params common.SearchParams) ([]common.UnifiedPaper, int, error) {
-	result, err := s.client.SearchPapers(ctx, params.Query, params.Offset, params.Limit)
+	var (
+		result *semanticscholar.SearchResult
+		err    error
+	)
+
+	if hasSemanticScholarStructuredFilters(params) {
+		result, err = s.client.SearchPapersWithParams(ctx, buildSemanticScholarSearchParam(params))
+	} else {
+		result, err = s.client.SearchPapers(ctx, params.Query, params.Offset, params.Limit)
+	}
 	if err != nil {
 		return nil, 0, err
 	}

@@ -3,6 +3,7 @@ package sources
 import (
 	"context"
 	"fmt"
+
 	"github.com/Seelly/scholar_mcp_server/sources/scopus"
 
 	"github.com/Seelly/scholar_mcp_server/common"
@@ -37,7 +38,16 @@ func (s *ScopusSource) SearchPapers(ctx context.Context, params common.SearchPar
 		return nil, 0, fmt.Errorf("Scopus client not initialized - API key required")
 	}
 
-	result, err := s.client.SearchPapers(ctx, params.Query, params.Offset, params.Limit)
+	var (
+		result *scopus.SearchResult
+		err    error
+	)
+
+	if hasScopusStructuredFilters(params) {
+		result, err = s.client.SearchPapersWithParams(ctx, buildScopusSearchParam(params))
+	} else {
+		result, err = s.client.SearchPapers(ctx, params.Query, params.Offset, params.Limit)
+	}
 	if err != nil {
 		return nil, 0, err
 	}

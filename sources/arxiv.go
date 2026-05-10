@@ -2,6 +2,7 @@ package sources
 
 import (
 	"context"
+
 	"github.com/Seelly/scholar_mcp_server/common"
 	"github.com/Seelly/scholar_mcp_server/sources/arxiv"
 )
@@ -27,7 +28,12 @@ func (a *ArxivSource) GetSourceName() string {
 
 // SearchPapers 搜索论文
 func (a *ArxivSource) SearchPapers(ctx context.Context, params common.SearchParams) ([]common.UnifiedPaper, int, error) {
-	result, err := a.client.SearchPapers(ctx, params.Query, params.Offset, params.Limit)
+	query := params.Query
+	if hasArxivStructuredFilters(params) {
+		query = buildArxivSearchQuery(params)
+	}
+
+	result, err := a.client.SearchPapers(ctx, query, params.Offset, params.Limit)
 	if err != nil {
 		return nil, 0, err
 	}
