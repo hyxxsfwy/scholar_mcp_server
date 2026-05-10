@@ -93,6 +93,9 @@ func NormalizeSearchParams(params *SearchParams) {
 	}
 
 	// 标准化排序参数
+	if params.SortBy == "citations" {
+		params.SortBy = "citation_count"
+	}
 	if params.SortBy == "" {
 		params.SortBy = "relevance"
 	}
@@ -390,7 +393,7 @@ func isValidYear(year string) bool {
 
 func isValidSortField(field string) bool {
 	validFields := []string{
-		"relevance", "date", "published_date", "citation_count",
+		"relevance", "date", "published_date", "citation_count", "citations",
 		"read_count", "title", "author", "journal",
 	}
 	for _, valid := range validFields {

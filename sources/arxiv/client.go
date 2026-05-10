@@ -12,6 +12,24 @@ import (
 	"time"
 )
 
+func doWithRetry(ctx context.Context, client *http.Client, req *http.Request) (*http.Response, error) {
+	var resp *http.Response
+	var err error
+	for i := 0; i < 3; i++ {
+		resp, err = client.Do(req.Clone(ctx))
+		if err != nil || resp.StatusCode != http.StatusTooManyRequests {
+			return resp, err
+		}
+		resp.Body.Close()
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(time.Duration(1<<uint(i)) * time.Second):
+		}
+	}
+	return resp, err
+}
+
 const (
 	ArxivAPIBaseURL = "http://export.arxiv.org/api/query"
 	DefaultPageSize = 10
@@ -28,7 +46,7 @@ type ArxivClient struct {
 func NewArxivClient() *ArxivClient {
 	return &ArxivClient{
 		client: &http.Client{
-			Timeout: 30 * time.Second,
+			Timeout: 60 * time.Second,
 		},
 		baseURL: ArxivAPIBaseURL,
 	}
@@ -65,7 +83,7 @@ func (c *ArxivClient) SearchPapers(ctx context.Context, query string, start, max
 
 	req.Header.Set("User-Agent", "arXiv-MCP-Client/1.0")
 
-	resp, err := c.client.Do(req)
+	resp, err := doWithRetry(ctx, c.client, req)
 	if err != nil {
 		return nil, fmt.Errorf("请求失败: %w", err)
 	}
@@ -75,19 +93,16 @@ func (c *ArxivClient) SearchPapers(ctx context.Context, query string, start, max
 		return nil, fmt.Errorf("API请求失败，状态码: %d", resp.StatusCode)
 	}
 
-	// 读取响应内容
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %w", err)
 	}
 
-	// 解析XML响应
 	var feed AtomFeed
 	if err := xml.Unmarshal(body, &feed); err != nil {
 		return nil, fmt.Errorf("解析XML响应失败: %w", err)
 	}
 
-	// 转换为我们的数据结构
 	result := &SearchResult{
 		Query:      query,
 		Start:      start,
@@ -123,7 +138,7 @@ func (c *ArxivClient) GetPaper(ctx context.Context, arxivID string) (*Paper, err
 
 	req.Header.Set("User-Agent", "arXiv-MCP-Client/1.0")
 
-	resp, err := c.client.Do(req)
+	resp, err := doWithRetry(ctx, c.client, req)
 	if err != nil {
 		return nil, fmt.Errorf("请求失败: %w", err)
 	}
@@ -133,13 +148,11 @@ func (c *ArxivClient) GetPaper(ctx context.Context, arxivID string) (*Paper, err
 		return nil, fmt.Errorf("API请求失败，状态码: %d", resp.StatusCode)
 	}
 
-	// 读取响应内容
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %w", err)
 	}
 
-	// 解析XML响应
 	var feed AtomFeed
 	if err := xml.Unmarshal(body, &feed); err != nil {
 		return nil, fmt.Errorf("解析XML响应失败: %w", err)

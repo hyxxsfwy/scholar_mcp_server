@@ -67,25 +67,22 @@ func (c *SciHubClient) SearchPapers(ctx context.Context, query string, maxResult
 		maxResults = MaxMaxResults
 	}
 
-	// Sci-Hub不支持传统搜索，我们尝试将查询作为DOI或标题处理
-	papers := []Paper{}
-
-	// 如果查询看起来像DOI，直接尝试获取
-	if isDOI(query) {
-		if paper, err := c.GetPaper(ctx, query); err == nil {
-			papers = append(papers, *paper)
-		}
+	// Sci-Hub只支持通过DOI查找，不支持关键词搜索
+	if !isDOI(query) {
+		return nil, fmt.Errorf("Sci-Hub仅支持DOI查找，不支持关键词搜索")
 	}
 
-	// 返回搜索结果
-	result := &SearchResult{
+	papers := []Paper{}
+	if paper, err := c.GetPaper(ctx, query); err == nil {
+		papers = append(papers, *paper)
+	}
+
+	return &SearchResult{
 		Query:  query,
 		Papers: papers,
 		Total:  len(papers),
 		Source: "Sci-Hub",
-	}
-
-	return result, nil
+	}, nil
 }
 
 // GetPaper 根据DOI等标识符获取论文PDF

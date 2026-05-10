@@ -12,6 +12,24 @@ import (
 	"time"
 )
 
+func doWithRetry(ctx context.Context, client *http.Client, req *http.Request) (*http.Response, error) {
+	var resp *http.Response
+	var err error
+	for i := 0; i < 3; i++ {
+		resp, err = client.Do(req.Clone(ctx))
+		if err != nil || resp.StatusCode != http.StatusTooManyRequests {
+			return resp, err
+		}
+		resp.Body.Close()
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(time.Duration(1<<uint(i)) * time.Second):
+		}
+	}
+	return resp, err
+}
+
 const (
 	SemanticScholarAPIBaseURL = "https://api.semanticscholar.org/graph/v1"
 	DefaultLimit              = 10
@@ -78,8 +96,7 @@ func (c *SemanticScholarClient) SearchPapers(ctx context.Context, query string, 
 		req.Header.Set("x-api-key", c.apiKey)
 	}
 
-	// 发送请求
-	resp, err := c.client.Do(req)
+	resp, err := doWithRetry(ctx, c.client, req)
 	if err != nil {
 		return nil, fmt.Errorf("请求失败: %w", err)
 	}
@@ -90,28 +107,23 @@ func (c *SemanticScholarClient) SearchPapers(ctx context.Context, query string, 
 		return nil, fmt.Errorf("API请求失败，状态码: %d, 响应: %s", resp.StatusCode, string(body))
 	}
 
-	// 读取响应内容
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %w", err)
 	}
 
-	// 解析JSON响应
 	var apiResponse APIResponse
 	if err := json.Unmarshal(body, &apiResponse); err != nil {
 		return nil, fmt.Errorf("解析JSON响应失败: %w", err)
 	}
 
-	// 转换为我们的搜索结果结构
-	result := &SearchResult{
+	return &SearchResult{
 		Query:  query,
 		Offset: offset,
 		Limit:  limit,
 		Total:  apiResponse.Total,
 		Papers: apiResponse.Data,
-	}
-
-	return result, nil
+	}, nil
 }
 
 // GetPaper 根据Paper ID获取特定论文
@@ -137,8 +149,7 @@ func (c *SemanticScholarClient) GetPaper(ctx context.Context, paperID string) (*
 		req.Header.Set("x-api-key", c.apiKey)
 	}
 
-	// 发送请求
-	resp, err := c.client.Do(req)
+	resp, err := doWithRetry(ctx, c.client, req)
 	if err != nil {
 		return nil, fmt.Errorf("请求失败: %w", err)
 	}
@@ -147,19 +158,16 @@ func (c *SemanticScholarClient) GetPaper(ctx context.Context, paperID string) (*
 	if resp.StatusCode == http.StatusNotFound {
 		return nil, fmt.Errorf("未找到ID为 %s 的论文", paperID)
 	}
-
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return nil, fmt.Errorf("API请求失败，状态码: %d, 响应: %s", resp.StatusCode, string(body))
 	}
 
-	// 读取响应内容
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %w", err)
 	}
 
-	// 解析JSON响应
 	var paper Paper
 	if err := json.Unmarshal(body, &paper); err != nil {
 		return nil, fmt.Errorf("解析JSON响应失败: %w", err)
@@ -224,8 +232,7 @@ func (c *SemanticScholarClient) SearchPapersWithParams(ctx context.Context, para
 		req.Header.Set("x-api-key", c.apiKey)
 	}
 
-	// 发送请求
-	resp, err := c.client.Do(req)
+	resp, err := doWithRetry(ctx, c.client, req)
 	if err != nil {
 		return nil, fmt.Errorf("请求失败: %w", err)
 	}
@@ -236,26 +243,21 @@ func (c *SemanticScholarClient) SearchPapersWithParams(ctx context.Context, para
 		return nil, fmt.Errorf("API请求失败，状态码: %d, 响应: %s", resp.StatusCode, string(body))
 	}
 
-	// 读取响应内容
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, fmt.Errorf("读取响应失败: %w", err)
 	}
 
-	// 解析JSON响应
 	var apiResponse APIResponse
 	if err := json.Unmarshal(body, &apiResponse); err != nil {
 		return nil, fmt.Errorf("解析JSON响应失败: %w", err)
 	}
 
-	// 转换为我们的搜索结果结构
-	result := &SearchResult{
+	return &SearchResult{
 		Query:  params.Query,
 		Offset: params.Offset,
 		Limit:  params.Limit,
 		Total:  apiResponse.Total,
 		Papers: apiResponse.Data,
-	}
-
-	return result, nil
+	}, nil
 }
