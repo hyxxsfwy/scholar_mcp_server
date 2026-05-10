@@ -36,71 +36,14 @@ func (c *CrossrefSource) GetSourceName() string {
 
 // SearchPapers 搜索论文
 func (c *CrossrefSource) SearchPapers(ctx context.Context, params common.SearchParams) ([]common.UnifiedPaper, int, error) {
-	var (
-		result *crossref.SearchResult
-		err    error
-	)
-
-	if hasCrossrefStructuredFilters(params) {
-		result, err = c.client.SearchPapersWithParams(ctx, buildCrossrefSearchParam(params))
-	} else {
-		result, err = c.client.SearchPapers(ctx, params.Query, params.Offset, params.Limit)
-	}
+	result, err := c.searchResult(ctx, params)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	var papers []common.UnifiedPaper
+	papers := make([]common.UnifiedPaper, 0, len(result.Papers))
 	for _, paper := range result.Papers {
-		var authorNames []string
-		for _, author := range paper.Author {
-			name := ""
-			if author.Given != "" && author.Family != "" {
-				name = author.Given + " " + author.Family
-			} else if author.Family != "" {
-				name = author.Family
-			}
-			if name != "" {
-				authorNames = append(authorNames, name)
-			}
-		}
-
-		title := ""
-		if len(paper.Title) > 0 {
-			title = paper.Title[0]
-		}
-
-		journal := ""
-		if len(paper.ContainerTitle) > 0 {
-			journal = paper.ContainerTitle[0]
-		}
-
-		unified := common.UnifiedPaper{
-			ID:            paper.DOI,
-			DOI:           paper.DOI,
-			Title:         title,
-			Authors:       authorNames,
-			Journal:       journal,
-			Publisher:     paper.Publisher,
-			Volume:        paper.Volume,
-			Issue:         paper.Issue,
-			Pages:         paper.Page,
-			CitationCount: paper.IsReferencedByCount,
-			URL:           paper.URL,
-			Type:          paper.Type,
-			Source:        "crossref",
-			ExternalIDs: map[string]string{
-				"doi": paper.DOI,
-			},
-			Metadata: map[string]interface{}{
-				"references_count": paper.ReferencesCount,
-				"license":          paper.License,
-				"funder":           paper.Funder,
-				"language":         paper.Language,
-				"subject":          paper.Subject,
-			},
-		}
-		papers = append(papers, unified)
+		papers = append(papers, newCrossrefUnifiedPaper(paper))
 	}
 
 	return papers, result.TotalResults, nil
@@ -113,35 +56,25 @@ func (c *CrossrefSource) GetPaper(ctx context.Context, identifier string) (*comm
 		return nil, err
 	}
 
-	var authorNames []string
-	for _, author := range paper.Author {
-		name := ""
-		if author.Given != "" && author.Family != "" {
-			name = author.Given + " " + author.Family
-		} else if author.Family != "" {
-			name = author.Family
-		}
-		if name != "" {
-			authorNames = append(authorNames, name)
-		}
+	unified := newCrossrefUnifiedPaper(*paper)
+	return &unified, nil
+}
+
+func (c *CrossrefSource) searchResult(ctx context.Context, params common.SearchParams) (*crossref.SearchResult, error) {
+	if hasCrossrefStructuredFilters(params) {
+		return c.client.SearchPapersWithParams(ctx, buildCrossrefSearchParam(params))
 	}
 
-	title := ""
-	if len(paper.Title) > 0 {
-		title = paper.Title[0]
-	}
+	return c.client.SearchPapers(ctx, params.Query, params.Offset, params.Limit)
+}
 
-	journal := ""
-	if len(paper.ContainerTitle) > 0 {
-		journal = paper.ContainerTitle[0]
-	}
-
-	unified := &common.UnifiedPaper{
+func newCrossrefUnifiedPaper(paper crossref.Paper) common.UnifiedPaper {
+	return common.UnifiedPaper{
 		ID:            paper.DOI,
 		DOI:           paper.DOI,
-		Title:         title,
-		Authors:       authorNames,
-		Journal:       journal,
+		Title:         firstCrossrefValue(paper.Title),
+		Authors:       crossrefAuthorNames(paper.Author),
+		Journal:       firstCrossrefValue(paper.ContainerTitle),
 		Publisher:     paper.Publisher,
 		Volume:        paper.Volume,
 		Issue:         paper.Issue,
@@ -157,10 +90,38 @@ func (c *CrossrefSource) GetPaper(ctx context.Context, identifier string) (*comm
 			"references_count": paper.ReferencesCount,
 			"license":          paper.License,
 			"funder":           paper.Funder,
+			"language":         paper.Language,
+			"subject":          paper.Subject,
 		},
 	}
+}
 
-	return unified, nil
+func crossrefAuthorNames(authors []crossref.Author) []string {
+	names := make([]string, 0, len(authors))
+	for _, author := range authors {
+		name := crossrefAuthorName(author)
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+
+	return names
+}
+
+func crossrefAuthorName(author crossref.Author) string {
+	if author.Given != "" && author.Family != "" {
+		return author.Given + " " + author.Family
+	}
+
+	return author.Family
+}
+
+func firstCrossrefValue(values []string) string {
+	if len(values) == 0 {
+		return ""
+	}
+
+	return values[0]
 }
 
 // IsAvailable 检查数据源是否可用

@@ -4,13 +4,15 @@ import (
 	"testing"
 )
 
+type validationTestCase struct {
+	name     string
+	params   SearchParams
+	wantErr  bool
+	errField string
+}
+
 func TestValidateSearchParams(t *testing.T) {
-	tests := []struct {
-		name     string
-		params   SearchParams
-		wantErr  bool
-		errField string
-	}{
+	tests := []validationTestCase{
 		{"valid", SearchParams{Query: "machine learning"}, false, ""},
 		{"title only", SearchParams{Title: "Portfolio Selection"}, false, ""},
 		{"empty search", SearchParams{}, true, "query"},
@@ -27,27 +29,34 @@ func TestValidateSearchParams(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ValidateSearchParams(tt.params)
-			if tt.wantErr && result.Valid {
-				t.Errorf("expected error but got valid")
-			}
-			if !tt.wantErr && !result.Valid {
-				t.Errorf("expected valid but got errors: %v", result.Errors)
-			}
-			if tt.errField != "" {
-				found := false
-				for _, e := range result.Errors {
-					if e.Field == tt.errField {
-						found = true
-						break
-					}
-				}
-				if !found {
-					t.Errorf("expected error on field %q, got %v", tt.errField, result.Errors)
-				}
-			}
+			assertValidationResult(t, tt)
 		})
 	}
+}
+
+func assertValidationResult(t *testing.T, tt validationTestCase) {
+	t.Helper()
+
+	result := ValidateSearchParams(tt.params)
+	if tt.wantErr && result.Valid {
+		t.Errorf("expected error but got valid")
+	}
+	if !tt.wantErr && !result.Valid {
+		t.Errorf("expected valid but got errors: %v", result.Errors)
+	}
+	if tt.errField != "" && !hasValidationError(result.Errors, tt.errField) {
+		t.Errorf("expected error on field %q, got %v", tt.errField, result.Errors)
+	}
+}
+
+func hasValidationError(errors []ValidationError, field string) bool {
+	for _, validationError := range errors {
+		if validationError.Field == field {
+			return true
+		}
+	}
+
+	return false
 }
 
 func TestNormalizeSearchParams(t *testing.T) {

@@ -18,6 +18,13 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/auth"
 )
 
+const (
+	methodNotAllowedMessage = "Method not allowed"
+	headerContentType       = "Content-Type"
+	contentTypeForm         = "application/x-www-form-urlencoded"
+	contentTypeJSON         = "application/json"
+)
+
 // OAuthServer implements a minimal OAuth 2.0 authorization server
 // with dynamic client registration (DCR) for local MCP use.
 type OAuthServer struct {
@@ -59,7 +66,7 @@ func NewOAuthServer(issuerURL string) *OAuthServer {
 	}
 }
 
-func (s *OAuthServer) handler() http.Handler {
+func (s *OAuthServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if s.mux == nil {
 		mux := http.NewServeMux()
 		mux.HandleFunc("/.well-known/oauth-protected-resource", s.handleProtectedResourceMeta)
@@ -69,24 +76,25 @@ func (s *OAuthServer) handler() http.Handler {
 		mux.HandleFunc("/token", s.handleToken)
 		s.mux = mux
 	}
-	return s.mux
+
+	s.mux.ServeHTTP(w, r)
 }
 
 // --- Protected Resource Metadata (RFC 9728) ---
 
 type protectedResourceMeta struct {
-	Resource              string   `json:"resource"`
-	AuthorizationServers  []string `json:"authorization_servers"`
+	Resource               string   `json:"resource"`
+	AuthorizationServers   []string `json:"authorization_servers"`
 	BearerMethodsSupported []string `json:"bearer_methods_supported,omitempty"`
-	ResourceName          string   `json:"resource_name,omitempty"`
+	ResourceName           string   `json:"resource_name,omitempty"`
 }
 
 func (s *OAuthServer) handleProtectedResourceMeta(w http.ResponseWriter, r *http.Request) {
 	meta := protectedResourceMeta{
-		Resource:              s.issuerURL,
-		AuthorizationServers:  []string{s.issuerURL},
+		Resource:               s.issuerURL,
+		AuthorizationServers:   []string{s.issuerURL},
 		BearerMethodsSupported: []string{"header"},
-		ResourceName:          "Scholar Aggregator MCP Server",
+		ResourceName:           "Scholar Aggregator MCP Server",
 	}
 	writeJSON(w, http.StatusOK, meta)
 }
@@ -94,26 +102,26 @@ func (s *OAuthServer) handleProtectedResourceMeta(w http.ResponseWriter, r *http
 // --- Authorization Server Metadata (RFC 8414) ---
 
 type authServerMeta struct {
-	Issuer                string   `json:"issuer"`
-	AuthorizationEndpoint string   `json:"authorization_endpoint"`
-	TokenEndpoint         string   `json:"token_endpoint"`
-	RegistrationEndpoint  string   `json:"registration_endpoint,omitempty"`
-	ScopesSupported       []string `json:"scopes_supported,omitempty"`
-	ResponseTypesSupported []string `json:"response_types_supported"`
-	GrantTypesSupported   []string `json:"grant_types_supported,omitempty"`
+	Issuer                            string   `json:"issuer"`
+	AuthorizationEndpoint             string   `json:"authorization_endpoint"`
+	TokenEndpoint                     string   `json:"token_endpoint"`
+	RegistrationEndpoint              string   `json:"registration_endpoint,omitempty"`
+	ScopesSupported                   []string `json:"scopes_supported,omitempty"`
+	ResponseTypesSupported            []string `json:"response_types_supported"`
+	GrantTypesSupported               []string `json:"grant_types_supported,omitempty"`
 	TokenEndpointAuthMethodsSupported []string `json:"token_endpoint_auth_methods_supported,omitempty"`
 	CodeChallengeMethodsSupported     []string `json:"code_challenge_methods_supported,omitempty"`
 }
 
 func (s *OAuthServer) handleAuthServerMeta(w http.ResponseWriter, r *http.Request) {
 	meta := authServerMeta{
-		Issuer:                s.issuerURL,
-		AuthorizationEndpoint: s.issuerURL + "/authorize",
-		TokenEndpoint:         s.issuerURL + "/token",
-		RegistrationEndpoint:  s.issuerURL + "/register",
-		ScopesSupported:       []string{"mcp"},
-		ResponseTypesSupported: []string{"code"},
-		GrantTypesSupported:   []string{"authorization_code", "refresh_token"},
+		Issuer:                            s.issuerURL,
+		AuthorizationEndpoint:             s.issuerURL + "/authorize",
+		TokenEndpoint:                     s.issuerURL + "/token",
+		RegistrationEndpoint:              s.issuerURL + "/register",
+		ScopesSupported:                   []string{"mcp"},
+		ResponseTypesSupported:            []string{"code"},
+		GrantTypesSupported:               []string{"authorization_code", "refresh_token"},
 		TokenEndpointAuthMethodsSupported: []string{"client_secret_post", "none"},
 		CodeChallengeMethodsSupported:     []string{"S256"},
 	}
@@ -129,18 +137,18 @@ type registrationRequest struct {
 }
 
 type registrationResponse struct {
-	ClientID              string   `json:"client_id"`
-	ClientSecret          string   `json:"client_secret,omitempty"`
-	ClientIDIssuedAt      int64    `json:"client_id_issued_at"`
-	ClientSecretExpiresAt int64    `json:"client_secret_expires_at,omitempty"`
-	RedirectURIs          []string `json:"redirect_uris"`
-	GrantTypes            []string `json:"grant_types"`
-	TokenEndpointAuthMethod string `json:"token_endpoint_auth_method"`
+	ClientID                string   `json:"client_id"`
+	ClientSecret            string   `json:"client_secret,omitempty"`
+	ClientIDIssuedAt        int64    `json:"client_id_issued_at"`
+	ClientSecretExpiresAt   int64    `json:"client_secret_expires_at,omitempty"`
+	RedirectURIs            []string `json:"redirect_uris"`
+	GrantTypes              []string `json:"grant_types"`
+	TokenEndpointAuthMethod string   `json:"token_endpoint_auth_method"`
 }
 
 func (s *OAuthServer) handleRegistration(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, methodNotAllowedMessage, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -185,7 +193,7 @@ func (s *OAuthServer) handleRegistration(w http.ResponseWriter, r *http.Request)
 
 func (s *OAuthServer) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, methodNotAllowedMessage, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -273,50 +281,26 @@ type tokenResponse struct {
 
 func (s *OAuthServer) handleToken(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, methodNotAllowedMessage, http.StatusMethodNotAllowed)
 		return
 	}
 
-	if ct := r.Header.Get("Content-Type"); !strings.HasPrefix(ct, "application/x-www-form-urlencoded") && !strings.HasPrefix(ct, "application/json") {
+	contentType := r.Header.Get(headerContentType)
+	if !isSupportedTokenContentType(contentType) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_request", "error_description": "Content-Type must be application/x-www-form-urlencoded or application/json"})
 		return
 	}
 
-	var req tokenRequest
-	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_request"})
-			return
-		}
-	} else {
-		if err := r.ParseForm(); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_request"})
-			return
-		}
-		req = tokenRequest{
-			GrantType:    r.Form.Get("grant_type"),
-			Code:         r.Form.Get("code"),
-			CodeVerifier: r.Form.Get("code_verifier"),
-			RedirectURI:  r.Form.Get("redirect_uri"),
-			ClientID:     r.Form.Get("client_id"),
-			ClientSecret: r.Form.Get("client_secret"),
-			RefreshToken: r.Form.Get("refresh_token"),
-		}
+	req, err := parseTokenRequest(r, contentType)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_request"})
+		return
 	}
 
-	// Client authentication (optional for public clients)
-	if req.ClientID != "" {
-		s.mu.Lock()
-		client := s.clients[req.ClientID]
-		s.mu.Unlock()
-		if client == nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid_client"})
-			return
-		}
-		if client.clientSecret != "" && req.ClientSecret != client.clientSecret {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid_client"})
-			return
-		}
+	status, clientErr := s.validateTokenClient(req)
+	if clientErr != nil {
+		writeJSON(w, status, map[string]string{"error": "invalid_client"})
+		return
 	}
 
 	switch req.GrantType {
@@ -327,6 +311,52 @@ func (s *OAuthServer) handleToken(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "unsupported_grant_type"})
 	}
+}
+
+func isSupportedTokenContentType(contentType string) bool {
+	return strings.HasPrefix(contentType, contentTypeForm) || strings.HasPrefix(contentType, contentTypeJSON)
+}
+
+func parseTokenRequest(r *http.Request, contentType string) (tokenRequest, error) {
+	if strings.HasPrefix(contentType, contentTypeJSON) {
+		var req tokenRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			return tokenRequest{}, err
+		}
+		return req, nil
+	}
+
+	if err := r.ParseForm(); err != nil {
+		return tokenRequest{}, err
+	}
+
+	return tokenRequest{
+		GrantType:    r.Form.Get("grant_type"),
+		Code:         r.Form.Get("code"),
+		CodeVerifier: r.Form.Get("code_verifier"),
+		RedirectURI:  r.Form.Get("redirect_uri"),
+		ClientID:     r.Form.Get("client_id"),
+		ClientSecret: r.Form.Get("client_secret"),
+		RefreshToken: r.Form.Get("refresh_token"),
+	}, nil
+}
+
+func (s *OAuthServer) validateTokenClient(req tokenRequest) (int, error) {
+	if req.ClientID == "" {
+		return http.StatusOK, nil
+	}
+
+	s.mu.Lock()
+	client := s.clients[req.ClientID]
+	s.mu.Unlock()
+	if client == nil {
+		return http.StatusBadRequest, fmt.Errorf("unknown client")
+	}
+	if client.clientSecret != "" && req.ClientSecret != client.clientSecret {
+		return http.StatusUnauthorized, fmt.Errorf("invalid client secret")
+	}
+
+	return http.StatusOK, nil
 }
 
 func (s *OAuthServer) handleAuthorizationCodeGrant(w http.ResponseWriter, req tokenRequest) {

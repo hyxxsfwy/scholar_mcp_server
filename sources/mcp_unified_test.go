@@ -15,6 +15,20 @@ type fakePaperSource struct {
 	papers     []common.UnifiedPaper
 }
 
+type scholarSearchCase struct {
+	name         string
+	params       ScholarSearchParam
+	wantQuery    string
+	assertParams func(t *testing.T, got common.SearchParams)
+}
+
+type sourceSearchCase struct {
+	name         string
+	params       SourceSearchParam
+	wantQuery    string
+	assertParams func(t *testing.T, got common.SearchParams)
+}
+
 func (f *fakePaperSource) GetSourceName() string {
 	return f.name
 }
@@ -47,13 +61,60 @@ func (f *fakePaperSource) GetCapabilities() SourceCapabilities {
 	return SourceCapabilities{SupportsFullText: true, SupportsAuthorSearch: true}
 }
 
+func newFakeHandler() (*UnifiedMCPHandler, *fakePaperSource) {
+	manager := NewSourceManager()
+	source := &fakePaperSource{name: "fake"}
+	manager.RegisterSource("fake", source, SourceConfig{Enabled: true})
+
+	return NewUnifiedMCPHandlerWithManager(manager), source
+}
+
+func runScholarSearchCase(t *testing.T, tt scholarSearchCase) {
+	t.Helper()
+
+	handler, source := newFakeHandler()
+	params := tt.params
+
+	result, _, err := handler.SearchScholarPapers(context.Background(), nil, &params)
+	if err != nil {
+		t.Fatalf("SearchScholarPapers returned error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if source.lastParams.Query != tt.wantQuery {
+		t.Fatalf("expected derived query %q, got %q", tt.wantQuery, source.lastParams.Query)
+	}
+	if params.Query != tt.wantQuery {
+		t.Fatalf("expected params.Query to be normalized to %q, got %q", tt.wantQuery, params.Query)
+	}
+	tt.assertParams(t, source.lastParams)
+}
+
+func runSourceSearchCase(t *testing.T, tt sourceSearchCase) {
+	t.Helper()
+
+	handler, source := newFakeHandler()
+	params := tt.params
+
+	result, _, err := handler.SearchSourcePapers(context.Background(), nil, &params)
+	if err != nil {
+		t.Fatalf("SearchSourcePapers returned error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if source.lastParams.Query != tt.wantQuery {
+		t.Fatalf("expected derived query %q, got %q", tt.wantQuery, source.lastParams.Query)
+	}
+	if params.Query != tt.wantQuery {
+		t.Fatalf("expected params.Query to be normalized to %q, got %q", tt.wantQuery, params.Query)
+	}
+	tt.assertParams(t, source.lastParams)
+}
+
 func TestUnifiedMCPHandlerSearchScholarPapersStructuredOnly(t *testing.T) {
-	tests := []struct {
-		name         string
-		params       ScholarSearchParam
-		wantQuery    string
-		assertParams func(t *testing.T, got common.SearchParams)
-	}{
+	tests := []scholarSearchCase{
 		{
 			name:      "title only",
 			params:    ScholarSearchParam{Title: "Portfolio Selection"},
@@ -91,38 +152,13 @@ func TestUnifiedMCPHandlerSearchScholarPapersStructuredOnly(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			manager := NewSourceManager()
-			source := &fakePaperSource{name: "fake"}
-			manager.RegisterSource("fake", source, SourceConfig{Enabled: true})
-
-			handler := NewUnifiedMCPHandlerWithManager(manager)
-			params := tt.params
-
-			result, _, err := handler.SearchScholarPapers(context.Background(), nil, &params)
-			if err != nil {
-				t.Fatalf("SearchScholarPapers returned error: %v", err)
-			}
-			if result == nil {
-				t.Fatal("expected result, got nil")
-			}
-			if source.lastParams.Query != tt.wantQuery {
-				t.Fatalf("expected derived query %q, got %q", tt.wantQuery, source.lastParams.Query)
-			}
-			if params.Query != tt.wantQuery {
-				t.Fatalf("expected params.Query to be normalized to %q, got %q", tt.wantQuery, params.Query)
-			}
-			tt.assertParams(t, source.lastParams)
+			runScholarSearchCase(t, tt)
 		})
 	}
 }
 
 func TestUnifiedMCPHandlerSearchSourcePapersStructuredOnly(t *testing.T) {
-	tests := []struct {
-		name         string
-		params       SourceSearchParam
-		wantQuery    string
-		assertParams func(t *testing.T, got common.SearchParams)
-	}{
+	tests := []sourceSearchCase{
 		{
 			name:      "title only",
 			params:    SourceSearchParam{Source: "fake", ScholarSearchParam: ScholarSearchParam{Title: "DeepLOB"}},
@@ -160,27 +196,7 @@ func TestUnifiedMCPHandlerSearchSourcePapersStructuredOnly(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			manager := NewSourceManager()
-			source := &fakePaperSource{name: "fake"}
-			manager.RegisterSource("fake", source, SourceConfig{Enabled: true})
-
-			handler := NewUnifiedMCPHandlerWithManager(manager)
-			params := tt.params
-
-			result, _, err := handler.SearchSourcePapers(context.Background(), nil, &params)
-			if err != nil {
-				t.Fatalf("SearchSourcePapers returned error: %v", err)
-			}
-			if result == nil {
-				t.Fatal("expected result, got nil")
-			}
-			if source.lastParams.Query != tt.wantQuery {
-				t.Fatalf("expected derived query %q, got %q", tt.wantQuery, source.lastParams.Query)
-			}
-			if params.Query != tt.wantQuery {
-				t.Fatalf("expected params.Query to be normalized to %q, got %q", tt.wantQuery, params.Query)
-			}
-			tt.assertParams(t, source.lastParams)
+			runSourceSearchCase(t, tt)
 		})
 	}
 }

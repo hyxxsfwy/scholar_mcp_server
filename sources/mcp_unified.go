@@ -2,7 +2,6 @@ package sources
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"strings"
@@ -125,19 +124,13 @@ func (h *UnifiedMCPHandler) SearchScholarPapers(ctx context.Context, req *mcp.Ca
 	// 格式化输出
 	resultText := h.formatAggregatedSearchResult(result, params)
 
-	// 将结果转换为JSON
-	jsonResult, err := json.Marshal(result)
-	if err != nil {
-		log.Printf("[ERROR] JSON序列化失败: %v", err)
-	}
-
 	log.Printf("[INFO] ========== 聚合搜索完成 ==========")
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: resultText},
 		},
 		Meta: map[string]interface{}{
-			"structured_data": string(jsonResult),
+			"structured_data": marshalStructuredData(result),
 		},
 	}, nil, nil
 }
@@ -145,7 +138,7 @@ func (h *UnifiedMCPHandler) SearchScholarPapers(ctx context.Context, req *mcp.Ca
 // GetScholarPaper 获取学术论文详情MCP工具
 func (h *UnifiedMCPHandler) GetScholarPaper(ctx context.Context, req *mcp.CallToolRequest, params *ScholarGetParam) (*mcp.CallToolResult, any, error) {
 	log.Printf("[DEBUG] ========== 开始获取学术论文详情 ==========")
-	log.Printf("[DEBUG] 接收到的参数: %+v", params)
+	log.Printf(logReceivedParamsFmt, params)
 
 	// 验证标识符参数
 	if strings.TrimSpace(params.Identifier) == "" {
@@ -165,19 +158,13 @@ func (h *UnifiedMCPHandler) GetScholarPaper(ctx context.Context, req *mcp.CallTo
 	// 格式化输出
 	resultText := h.formatPaperDetail(paper)
 
-	// 将结果转换为JSON
-	jsonResult, err := json.Marshal(paper)
-	if err != nil {
-		log.Printf("[ERROR] JSON序列化失败: %v", err)
-	}
-
 	log.Printf("[INFO] ========== 学术论文详情获取完成 ==========")
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: resultText},
 		},
 		Meta: map[string]interface{}{
-			"structured_data": string(jsonResult),
+			"structured_data": marshalStructuredData(paper),
 		},
 	}, nil, nil
 }
@@ -185,7 +172,7 @@ func (h *UnifiedMCPHandler) GetScholarPaper(ctx context.Context, req *mcp.CallTo
 // SearchSourcePapers 单个数据源搜索MCP工具
 func (h *UnifiedMCPHandler) SearchSourcePapers(ctx context.Context, req *mcp.CallToolRequest, params *SourceSearchParam) (*mcp.CallToolResult, any, error) {
 	log.Printf("[DEBUG] ========== 开始单个数据源搜索 ==========")
-	log.Printf("[DEBUG] 接收到的参数: %+v", params)
+	log.Printf(logReceivedParamsFmt, params)
 
 	// 验证参数
 	if strings.TrimSpace(params.Source) == "" {
@@ -250,18 +237,13 @@ func (h *UnifiedMCPHandler) SearchSourcePapers(ctx context.Context, req *mcp.Cal
 		"papers":      papers,
 	}
 
-	jsonResult, err := json.Marshal(result)
-	if err != nil {
-		log.Printf("[ERROR] JSON序列化失败: %v", err)
-	}
-
 	log.Printf("[INFO] %s搜索完成: %d篇论文, 耗时%v", params.Source, len(papers), searchTime)
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: resultText},
 		},
 		Meta: map[string]interface{}{
-			"structured_data": string(jsonResult),
+			"structured_data": marshalStructuredData(result),
 		},
 	}, nil, nil
 }
@@ -269,7 +251,7 @@ func (h *UnifiedMCPHandler) SearchSourcePapers(ctx context.Context, req *mcp.Cal
 // GetSourcePaper 从单个数据源获取论文详情MCP工具
 func (h *UnifiedMCPHandler) GetSourcePaper(ctx context.Context, req *mcp.CallToolRequest, params *SourceGetParam) (*mcp.CallToolResult, any, error) {
 	log.Printf("[DEBUG] ========== 开始从单个数据源获取论文详情 ==========")
-	log.Printf("[DEBUG] 接收到的参数: %+v", params)
+	log.Printf(logReceivedParamsFmt, params)
 
 	// 验证参数
 	if strings.TrimSpace(params.Source) == "" {
@@ -297,19 +279,13 @@ func (h *UnifiedMCPHandler) GetSourcePaper(ctx context.Context, req *mcp.CallToo
 	// 格式化输出
 	resultText := h.formatSourcePaperDetail(params.Source, paper)
 
-	// 将结果转换为JSON
-	jsonResult, err := json.Marshal(paper)
-	if err != nil {
-		log.Printf("[ERROR] JSON序列化失败: %v", err)
-	}
-
 	log.Printf("[INFO] 从%s成功获取论文详情: %s", params.Source, paper.Title)
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: resultText},
 		},
 		Meta: map[string]interface{}{
-			"structured_data": string(jsonResult),
+			"structured_data": marshalStructuredData(paper),
 		},
 	}, nil, nil
 }
@@ -382,18 +358,13 @@ func (h *UnifiedMCPHandler) ListAvailableSources(ctx context.Context, req *mcp.C
 		"sources":         sourceInfo,
 	}
 
-	jsonResult, err := json.Marshal(result)
-	if err != nil {
-		log.Printf("[ERROR] JSON序列化失败: %v", err)
-	}
-
 	log.Printf("[INFO] 数据源列表获取完成: 总计%d个, 已启用%d个", len(allSources), len(enabledSources))
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{
 			&mcp.TextContent{Text: resultBuilder.String()},
 		},
 		Meta: map[string]interface{}{
-			"structured_data": string(jsonResult),
+			"structured_data": marshalStructuredData(result),
 		},
 	}, nil, nil
 }
@@ -426,69 +397,11 @@ func (h *UnifiedMCPHandler) formatAggregatedSearchResult(result *AggregatedSearc
 	resultBuilder.WriteString(fmt.Sprintf("显示第%d-%d条结果，共找到约%d篇论文\n\n", params.Offset+1, params.Offset+len(result.Papers), result.TotalResults))
 
 	for i, paper := range result.Papers {
-		resultBuilder.WriteString(fmt.Sprintf("📄 %d. %s\n", i+1, paper.Title))
-		resultBuilder.WriteString(fmt.Sprintf("   来源: %s\n", paper.Source))
-		if paper.ID != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   ID: %s\n", paper.ID))
-		}
-		if paper.DOI != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   DOI: %s\n", paper.DOI))
-		}
-
-		if len(paper.Authors) > 0 {
-			authors := strings.Join(paper.Authors, ", ")
-			if len(authors) > 100 {
-				authors = authors[:100] + "..."
-			}
-			resultBuilder.WriteString(fmt.Sprintf("   作者: %s\n", authors))
-		}
-
-		if paper.Journal != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   期刊: %s\n", paper.Journal))
-		}
-		if paper.PublishedDate != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   发表日期: %s\n", paper.PublishedDate))
-		}
-		if paper.CitationCount > 0 {
-			resultBuilder.WriteString(fmt.Sprintf("   引用数: %d\n", paper.CitationCount))
-		}
-		if paper.IsOpenAccess {
-			resultBuilder.WriteString("   📖 开放获取\n")
-		}
-		if paper.Abstract != "" {
-			abstract := paper.Abstract
-			if len(abstract) > 300 {
-				abstract = abstract[:300] + "..."
-			}
-			resultBuilder.WriteString(fmt.Sprintf("   摘要: %s\n", abstract))
-		}
-		if paper.URL != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   链接: %s\n", paper.URL))
-		}
-		if paper.PDFURL != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   PDF: %s\n", paper.PDFURL))
-		}
-		resultBuilder.WriteString("\n")
+		resultBuilder.WriteString(formatPaperSearchEntry(i+1, paper, true, 300))
 	}
 
-	// 添加数据源状态信息
-	resultBuilder.WriteString("📊 数据源状态:\n")
-	for _, status := range result.SourceStatus {
-		statusIcon := "❌"
-		if status.Available {
-			statusIcon = "✅"
-		}
-		resultBuilder.WriteString(fmt.Sprintf("   %s %s: %s (%dms)\n",
-			statusIcon, status.Source, status.Message, status.ResponseTime))
-	}
-
-	// 添加搜索建议
-	if len(result.Suggestions) > 0 {
-		resultBuilder.WriteString("\n💡 搜索建议:\n")
-		for _, hint := range result.Suggestions {
-			resultBuilder.WriteString(fmt.Sprintf("   - %s: %s\n", hint.Type, hint.Description))
-		}
-	}
+	resultBuilder.WriteString(formatSourceStatusSection(result.SourceStatus))
+	resultBuilder.WriteString(formatSuggestionsSection(result.Suggestions))
 
 	return resultBuilder.String()
 }
@@ -497,81 +410,7 @@ func (h *UnifiedMCPHandler) formatPaperDetail(paper *common.UnifiedPaper) string
 	var resultBuilder strings.Builder
 	resultBuilder.WriteString("📄 学术论文详情\n\n")
 	resultBuilder.WriteString(fmt.Sprintf("📝 标题: %s\n\n", paper.Title))
-	resultBuilder.WriteString(fmt.Sprintf("🗃️ 数据源: %s\n", paper.Source))
-
-	if paper.ID != "" {
-		resultBuilder.WriteString(fmt.Sprintf("🆔 ID: %s\n", paper.ID))
-	}
-	if paper.DOI != "" {
-		resultBuilder.WriteString(fmt.Sprintf("🔗 DOI: %s\n", paper.DOI))
-	}
-
-	if len(paper.Authors) > 0 {
-		resultBuilder.WriteString(fmt.Sprintf("👥 作者: %s\n\n", strings.Join(paper.Authors, ", ")))
-	}
-
-	if paper.Journal != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📍 期刊: %s\n", paper.Journal))
-	}
-	if paper.Publisher != "" {
-		resultBuilder.WriteString(fmt.Sprintf("🏢 出版商: %s\n", paper.Publisher))
-	}
-	if paper.PublishedDate != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📅 发表日期: %s\n", paper.PublishedDate))
-	}
-	if paper.Volume != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📖 卷号: %s\n", paper.Volume))
-	}
-	if paper.Issue != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📄 期号: %s\n", paper.Issue))
-	}
-	if paper.Pages != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📄 页码: %s\n", paper.Pages))
-	}
-
-	if paper.CitationCount > 0 {
-		resultBuilder.WriteString(fmt.Sprintf("📊 引用数: %d\n", paper.CitationCount))
-	}
-	if paper.ReadCount > 0 {
-		resultBuilder.WriteString(fmt.Sprintf("👁️ 阅读数: %d\n", paper.ReadCount))
-	}
-
-	if paper.IsOpenAccess {
-		resultBuilder.WriteString("📖 开放获取: 是\n")
-	}
-
-	if len(paper.Categories) > 0 {
-		resultBuilder.WriteString(fmt.Sprintf("🏷️ 分类: %s\n", strings.Join(paper.Categories, ", ")))
-	}
-
-	if paper.Language != "" {
-		resultBuilder.WriteString(fmt.Sprintf("🌐 语言: %s\n", paper.Language))
-	}
-
-	if paper.Type != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📋 类型: %s\n", paper.Type))
-	}
-
-	if paper.Abstract != "" {
-		resultBuilder.WriteString(fmt.Sprintf("\n📋 摘要:\n%s\n", paper.Abstract))
-	}
-
-	// 外部链接
-	if len(paper.ExternalIDs) > 0 {
-		resultBuilder.WriteString("\n🔗 外部链接:\n")
-		for source, id := range paper.ExternalIDs {
-			if id != "" {
-				resultBuilder.WriteString(fmt.Sprintf("   %s: %s\n", source, id))
-			}
-		}
-	}
-
-	if paper.URL != "" {
-		resultBuilder.WriteString(fmt.Sprintf("\n🌐 原始链接: %s\n", paper.URL))
-	}
-	if paper.PDFURL != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📄 PDF下载: %s\n", paper.PDFURL))
-	}
+	resultBuilder.WriteString(formatPaperDetailBody(paper, true))
 
 	return resultBuilder.String()
 }
@@ -583,45 +422,7 @@ func (h *UnifiedMCPHandler) formatSourceSearchResult(source string, papers []com
 	resultBuilder.WriteString(fmt.Sprintf("显示第%d-%d条结果，共找到约%d篇论文\n\n", params.Offset+1, params.Offset+len(papers), total))
 
 	for i, paper := range papers {
-		resultBuilder.WriteString(fmt.Sprintf("📄 %d. %s\n", i+1, paper.Title))
-		if paper.ID != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   ID: %s\n", paper.ID))
-		}
-		if paper.DOI != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   DOI: %s\n", paper.DOI))
-		}
-
-		if len(paper.Authors) > 0 {
-			authors := strings.Join(paper.Authors, ", ")
-			if len(authors) > 100 {
-				authors = authors[:100] + "..."
-			}
-			resultBuilder.WriteString(fmt.Sprintf("   作者: %s\n", authors))
-		}
-
-		if paper.Journal != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   期刊: %s\n", paper.Journal))
-		}
-		if paper.PublishedDate != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   发表日期: %s\n", paper.PublishedDate))
-		}
-		if paper.CitationCount > 0 {
-			resultBuilder.WriteString(fmt.Sprintf("   引用数: %d\n", paper.CitationCount))
-		}
-		if paper.IsOpenAccess {
-			resultBuilder.WriteString("   📖 开放获取\n")
-		}
-		if paper.Abstract != "" {
-			abstract := paper.Abstract
-			if len(abstract) > 200 {
-				abstract = abstract[:200] + "..."
-			}
-			resultBuilder.WriteString(fmt.Sprintf("   摘要: %s\n", abstract))
-		}
-		if paper.URL != "" {
-			resultBuilder.WriteString(fmt.Sprintf("   链接: %s\n", paper.URL))
-		}
-		resultBuilder.WriteString("\n")
+		resultBuilder.WriteString(formatPaperSearchEntry(i+1, paper, false, 200))
 	}
 
 	return resultBuilder.String()
@@ -631,46 +432,7 @@ func (h *UnifiedMCPHandler) formatSourcePaperDetail(source string, paper *common
 	var resultBuilder strings.Builder
 	resultBuilder.WriteString(fmt.Sprintf("📄 %s 论文详情\n\n", source))
 	resultBuilder.WriteString(fmt.Sprintf("📝 标题: %s\n\n", paper.Title))
-
-	if paper.ID != "" {
-		resultBuilder.WriteString(fmt.Sprintf("🆔 ID: %s\n", paper.ID))
-	}
-	if paper.DOI != "" {
-		resultBuilder.WriteString(fmt.Sprintf("🔗 DOI: %s\n", paper.DOI))
-	}
-
-	if len(paper.Authors) > 0 {
-		resultBuilder.WriteString(fmt.Sprintf("👥 作者: %s\n\n", strings.Join(paper.Authors, ", ")))
-	}
-
-	if paper.Journal != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📍 期刊: %s\n", paper.Journal))
-	}
-	if paper.PublishedDate != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📅 发表日期: %s\n", paper.PublishedDate))
-	}
-	if paper.CitationCount > 0 {
-		resultBuilder.WriteString(fmt.Sprintf("📊 引用数: %d\n", paper.CitationCount))
-	}
-
-	if paper.IsOpenAccess {
-		resultBuilder.WriteString("📖 开放获取: 是\n")
-	}
-
-	if len(paper.Categories) > 0 {
-		resultBuilder.WriteString(fmt.Sprintf("🏷️ 分类: %s\n", strings.Join(paper.Categories, ", ")))
-	}
-
-	if paper.Abstract != "" {
-		resultBuilder.WriteString(fmt.Sprintf("\n📋 摘要:\n%s\n", paper.Abstract))
-	}
-
-	if paper.URL != "" {
-		resultBuilder.WriteString(fmt.Sprintf("\n🌐 原始链接: %s\n", paper.URL))
-	}
-	if paper.PDFURL != "" {
-		resultBuilder.WriteString(fmt.Sprintf("📄 PDF下载: %s\n", paper.PDFURL))
-	}
+	resultBuilder.WriteString(formatPaperDetailBody(paper, false))
 
 	return resultBuilder.String()
 }
