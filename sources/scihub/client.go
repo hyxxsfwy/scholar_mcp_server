@@ -1,6 +1,7 @@
 package scihub
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -10,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ledongthuc/pdf"
 )
 
 const (
@@ -17,6 +20,7 @@ const (
 	DefaultSciHubMirror = "https://sci-hub.jp"
 	DefaultMaxResults   = 10
 	MaxMaxResults       = 50
+	headerUserAgent     = "User-Agent"
 )
 
 // SciHubClient Sci-Hub客户端
@@ -113,7 +117,7 @@ func (c *SciHubClient) getPaperFromMirror(ctx context.Context, mirror, identifie
 		return nil, fmt.Errorf("创建请求失败: %w", err)
 	}
 
-	req.Header.Set("User-Agent", c.userAgent)
+	req.Header.Set(headerUserAgent, c.userAgent)
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 	req.Header.Set("Accept-Language", "en-US,en;q=0.5")
 
@@ -280,7 +284,7 @@ func (c *SciHubClient) checkMirrorConnectivity(ctx context.Context, mirrorURL st
 		return err
 	}
 
-	req.Header.Set("User-Agent", c.userAgent)
+	req.Header.Set(headerUserAgent, c.userAgent)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -293,6 +297,64 @@ func (c *SciHubClient) checkMirrorConnectivity(ctx context.Context, mirrorURL st
 	}
 
 	return nil
+}
+
+// DownloadAndConvertPDF 下载 PDF 并转换为 Markdown 文本
+func (c *SciHubClient) DownloadAndConvertPDF(ctx context.Context, doi string) (string, error) {
+	paper, err := c.GetPaper(ctx, doi)
+	if err != nil {
+		return "", fmt.Errorf("获取论文失败: %w", err)
+	}
+	if paper.PDFURL == "" {
+		return "", fmt.Errorf("未找到 PDF 链接")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "GET", paper.PDFURL, nil)
+	if err != nil {
+		return "", fmt.Errorf("创建下载请求失败: %w", err)
+	}
+	req.Header.Set(headerUserAgent, c.userAgent)
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("下载 PDF 失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("下载 PDF 失败，状态码: %d", resp.StatusCode)
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("读取 PDF 数据失败: %w", err)
+	}
+
+	r, err := pdf.NewReader(bytes.NewReader(data), int64(len(data)))
+	if err != nil {
+		return "", fmt.Errorf("解析 PDF 失败: %w", err)
+	}
+
+	var sb strings.Builder
+	if paper.Title != "" {
+		sb.WriteString("# ")
+		sb.WriteString(paper.Title)
+		sb.WriteString("\n\n")
+	}
+
+	for i := 1; i <= r.NumPage(); i++ {
+		page := r.Page(i)
+		if page.V.IsNull() {
+			continue
+		}
+		text, err := page.GetPlainText(nil)
+		if err != nil {
+			continue
+		}
+		sb.WriteString(text)
+	}
+
+	return sb.String(), nil
 }
 
 // 辅助函数：检查是否为DOI

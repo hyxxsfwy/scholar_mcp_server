@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Seelly/scholar_mcp_server/common"
+	"github.com/Seelly/scholar_mcp_server/sources/scihub"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -435,4 +436,102 @@ func (h *UnifiedMCPHandler) formatSourcePaperDetail(source string, paper *common
 	resultBuilder.WriteString(formatPaperDetailBody(paper, false))
 
 	return resultBuilder.String()
+}
+
+// SciHubFetchParam 从 Sci-Hub 获取论文参数
+type SciHubFetchParam struct {
+	DOI string `json:"doi"` // 论文 DOI
+}
+
+// SciHubPDFToMarkdownParam 从 Sci-Hub 下载 PDF 并转换为 Markdown 的参数
+type SciHubPDFToMarkdownParam struct {
+	DOI string `json:"doi"` // 论文 DOI
+}
+
+// FetchFromSciHub 通过 DOI 从 Sci-Hub 获取论文 PDF 链接
+func (h *UnifiedMCPHandler) FetchFromSciHub(ctx context.Context, req *mcp.CallToolRequest, params *SciHubFetchParam) (*mcp.CallToolResult, any, error) {
+	log.Printf("[DEBUG] ========== 开始从 Sci-Hub 获取论文 ==========")
+	log.Printf(logReceivedParamsFmt, params)
+
+	doi := strings.TrimSpace(params.DOI)
+	if doi == "" {
+		return nil, nil, fmt.Errorf("DOI 不能为空")
+	}
+
+	client := scihub.NewSciHubClient()
+	resp, err := client.GetPDFURL(ctx, doi)
+	if err != nil || !resp.Success {
+		msg := "未能从 Sci-Hub 获取该论文"
+		if err != nil {
+			msg = err.Error()
+		} else if resp != nil {
+			msg = resp.Message
+		}
+		log.Printf("[WARN] Sci-Hub 获取失败: %s", msg)
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{Text: fmt.Sprintf("❌ 无法从 Sci-Hub 获取 DOI 为 %s 的论文。\n原因: %s\n\n建议检查 DOI 是否正确，或稍后重试。", doi, msg)},
+			},
+		}, nil, nil
+	}
+
+	var sb strings.Builder
+	sb.WriteString("✅ 已从 Sci-Hub 找到论文 PDF\n\n")
+	sb.WriteString(fmt.Sprintf("📄 DOI: %s\n", doi))
+	sb.WriteString(fmt.Sprintf("🔗 PDF 链接: %s\n", resp.PDFURL))
+	sb.WriteString(fmt.Sprintf("🌐 Sci-Hub 页面: %s\n", resp.SciHubURL))
+	if resp.FileSize != "" {
+		sb.WriteString(fmt.Sprintf("📦 文件大小: %s\n", resp.FileSize))
+	}
+	sb.WriteString("\n💡 提示: 可使用 sciHubPDFToMarkdown 工具将该 PDF 转换为 Markdown 全文。")
+
+	log.Printf("[INFO] Sci-Hub 获取成功: DOI=%s, PDF=%s", doi, resp.PDFURL)
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: sb.String()},
+		},
+		Meta: map[string]interface{}{
+			"structured_data": marshalStructuredData(resp),
+		},
+	}, nil, nil
+}
+
+// SciHubPDFToMarkdown 下载 Sci-Hub PDF 并转换为 Markdown 全文
+func (h *UnifiedMCPHandler) SciHubPDFToMarkdown(ctx context.Context, req *mcp.CallToolRequest, params *SciHubPDFToMarkdownParam) (*mcp.CallToolResult, any, error) {
+	log.Printf("[DEBUG] ========== 开始 Sci-Hub PDF 转 Markdown ==========")
+	log.Printf(logReceivedParamsFmt, params)
+
+	doi := strings.TrimSpace(params.DOI)
+	if doi == "" {
+		return nil, nil, fmt.Errorf("DOI 不能为空")
+	}
+
+	client := scihub.NewSciHubClient()
+	markdown, err := client.DownloadAndConvertPDF(ctx, doi)
+	if err != nil {
+		log.Printf("[ERROR] PDF 转换失败: %v", err)
+		return nil, nil, fmt.Errorf("PDF 转换失败: %w", err)
+	}
+
+	if strings.TrimSpace(markdown) == "" {
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{
+				&mcp.TextContent{Text: fmt.Sprintf("⚠️ 已下载 DOI 为 %s 的 PDF，但未能提取到文本内容（可能为扫描版 PDF）。", doi)},
+			},
+		}, nil, nil
+	}
+
+	log.Printf("[INFO] PDF 转 Markdown 完成: DOI=%s, 字符数=%d", doi, len(markdown))
+	return &mcp.CallToolResult{
+		Content: []mcp.Content{
+			&mcp.TextContent{Text: markdown},
+		},
+		Meta: map[string]interface{}{
+			"structured_data": marshalStructuredData(map[string]interface{}{
+				"doi":            doi,
+				"char_count":     len(markdown),
+				"content_format": "markdown",
+			}),
+		},
+	}, nil, nil
 }

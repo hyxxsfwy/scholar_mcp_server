@@ -446,7 +446,7 @@ func (s *OAuthServer) handleRefreshTokenGrant(w http.ResponseWriter, req tokenRe
 
 // TokenVerifier returns an auth.TokenVerifier that validates tokens from this OAuth server.
 func (s *OAuthServer) TokenVerifier() auth.TokenVerifier {
-	return func(ctx context.Context, token string) (*auth.TokenInfo, error) {
+	return func(ctx context.Context, token string, req *http.Request) (*auth.TokenInfo, error) {
 		s.mu.Lock()
 		entry, ok := s.accessTokens[token]
 		s.mu.Unlock()

@@ -100,6 +100,13 @@ type ErrorResponse struct {
 	Message string `json:"message"` // 详细消息
 }
 
+// PDFConvertResult PDF 转换结果
+type PDFConvertResult struct {
+	DOI      string `json:"doi"`      // DOI
+	PDFURL   string `json:"pdf_url"`  // PDF 来源 URL
+	Markdown string `json:"markdown"` // 转换后的 Markdown 文本
+}
+
 // SearchHint 搜索提示
 type SearchHint struct {
 	Type       string  `json:"type"`       // 提示类型 (doi, pmid, title, etc.)
