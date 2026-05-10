@@ -174,49 +174,77 @@ func (a *ScholarAggregator) SearchPapers(ctx context.Context, params common.Sear
 func (a *ScholarAggregator) GetPaper(ctx context.Context, identifier string) (*common.UnifiedPaper, error) {
 	log.Printf("[INFO] 开始获取论文详情: %s", identifier)
 
-	// 根据标识符类型选择最佳数据源
-	var preferredSources []string
-
-	if common.IsDOI(identifier) {
-		preferredSources = []string{"crossref", "semantic_scholar"}
-	} else if common.IsArxivID(identifier) {
-		preferredSources = []string{"arxiv", "semantic_scholar"}
-	} else if common.IsPubMedID(identifier) {
-		preferredSources = []string{"semantic_scholar"}
+	preferredSources := preferredSourcesForIdentifier(identifier)
+	if paper, ok := a.tryGetPaperFromPreferredSources(ctx, identifier, preferredSources); ok {
+		return paper, nil
 	}
-
-	// 首先尝试优选数据源
-	for _, sourceName := range preferredSources {
-		if source, exists := a.sourceManager.GetSource(sourceName); exists {
-			if paper, err := source.GetPaper(ctx, identifier); err == nil {
-				log.Printf("[INFO] 从%s成功获取论文详情: %s", sourceName, paper.Title)
-				return paper, nil
-			}
-		}
-	}
-
-	// 如果优选数据源都失败，尝试所有启用的数据源
-	enabledSources := a.sourceManager.GetEnabledSources()
-	for sourceName, source := range enabledSources {
-		// 跳过已经尝试过的优选数据源
-		skip := false
-		for _, preferred := range preferredSources {
-			if sourceName == preferred {
-				skip = true
-				break
-			}
-		}
-		if skip {
-			continue
-		}
-
-		if paper, err := source.GetPaper(ctx, identifier); err == nil {
-			log.Printf("[INFO] 从%s成功获取论文详情: %s", sourceName, paper.Title)
-			return paper, nil
-		}
+	if paper, ok := a.tryGetPaperFromRemainingSources(ctx, identifier, preferredSources); ok {
+		return paper, nil
 	}
 
 	return nil, fmt.Errorf("未找到标识符为 %s 的论文", identifier)
+}
+
+func preferredSourcesForIdentifier(identifier string) []string {
+	if common.IsDOI(identifier) {
+		return []string{"crossref", "semantic_scholar", "openalex"}
+	}
+	if common.IsArxivID(identifier) {
+		return []string{"arxiv", "semantic_scholar"}
+	}
+	if common.IsPubMedID(identifier) {
+		return []string{"semantic_scholar"}
+	}
+
+	return nil
+}
+
+func (a *ScholarAggregator) tryGetPaperFromPreferredSources(ctx context.Context, identifier string, sourceNames []string) (*common.UnifiedPaper, bool) {
+	for _, sourceName := range sourceNames {
+		if paper, ok := a.tryGetPaperFromSource(ctx, identifier, sourceName); ok {
+			return paper, true
+		}
+	}
+
+	return nil, false
+}
+
+func (a *ScholarAggregator) tryGetPaperFromRemainingSources(ctx context.Context, identifier string, skippedSources []string) (*common.UnifiedPaper, bool) {
+	skipped := sourceNameSet(skippedSources)
+	for sourceName := range a.sourceManager.GetEnabledSources() {
+		if skipped[sourceName] {
+			continue
+		}
+		if paper, ok := a.tryGetPaperFromSource(ctx, identifier, sourceName); ok {
+			return paper, true
+		}
+	}
+
+	return nil, false
+}
+
+func (a *ScholarAggregator) tryGetPaperFromSource(ctx context.Context, identifier, sourceName string) (*common.UnifiedPaper, bool) {
+	source, exists := a.sourceManager.GetSource(sourceName)
+	if !exists {
+		return nil, false
+	}
+
+	paper, err := source.GetPaper(ctx, identifier)
+	if err != nil {
+		return nil, false
+	}
+
+	log.Printf("[INFO] 从%s成功获取论文详情: %s", sourceName, paper.Title)
+	return paper, true
+}
+
+func sourceNameSet(sourceNames []string) map[string]bool {
+	set := make(map[string]bool, len(sourceNames))
+	for _, sourceName := range sourceNames {
+		set[sourceName] = true
+	}
+
+	return set
 }
 
 // mergePapers 合并和去重论文

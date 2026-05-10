@@ -200,6 +200,7 @@ type Config struct {
 	ScopusAPIKey          string `json:"scopus_api_key"`
 	AdsabsAPIKey          string `json:"adsabs_api_key"`
 	GoogleScholarAPIKey   string `json:"google_scholar_api_key"`
+	OpenAlexEmail         string `json:"openalex_email"`
 
 	// 请求配置
 	RequestTimeout  int  `json:"request_timeout"`  // 请求超时时间(秒)
@@ -218,6 +219,7 @@ type Config struct {
 	EnableScopus          bool `json:"enable_scopus"`
 	EnableAdsabs          bool `json:"enable_adsabs"`
 	EnableGoogleScholar   bool `json:"enable_google_scholar"`
+	EnableOpenAlex        bool `json:"enable_openalex"`
 	EnableSciHub          bool `json:"enable_scihub"`
 	EnableArxiv           bool `json:"enable_arxiv"`
 }

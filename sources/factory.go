@@ -40,6 +40,12 @@ func (sf *SourceFactory) InitializeAllSources() *SourceManager {
 		sf.manager.RegisterSource("crossref", crossrefSource, configs["crossref"])
 	}
 
+	// 注册OpenAlex数据源
+	if configs["openalex"].Enabled {
+		openAlexSource := NewOpenAlexSource(configs["openalex"])
+		sf.manager.RegisterSource("openalex", openAlexSource, configs["openalex"])
+	}
+
 	// 注册Scopus数据源
 	if configs["scopus"].Enabled && configs["scopus"].APIKey != "" {
 		scopusSource := NewScopusSource(configs["scopus"])
@@ -108,6 +114,16 @@ func (sf *SourceFactory) loadConfigsFromEnv() map[string]SourceConfig {
 	configs["crossref"] = SourceConfig{
 		APIKey:         os.Getenv("CROSSREF_EMAIL"), // Crossref使用邮箱作为礼貌标识
 		Enabled:        getBoolEnv("ENABLE_CROSSREF", true),
+		RequestTimeout: defaultTimeout,
+		MaxRetries:     defaultRetries,
+		RateLimit:      defaultRateLimit,
+	}
+
+	// OpenAlex配置
+	configs["openalex"] = SourceConfig{
+		APIKey:         firstEnvValue("OPENALEX_EMAIL", "CROSSREF_EMAIL"), // OpenAlex使用邮箱进入polite pool
+		BaseURL:        os.Getenv("OPENALEX_BASE_URL"),
+		Enabled:        getBoolEnv("ENABLE_OPENALEX", true),
 		RequestTimeout: defaultTimeout,
 		MaxRetries:     defaultRetries,
 		RateLimit:      defaultRateLimit,

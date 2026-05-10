@@ -166,6 +166,42 @@ func TestBuildGoogleScholarSearchParamDerivesQueryForAuthorOnly(t *testing.T) {
 	}
 }
 
+func TestBuildOpenAlexSearchParam(t *testing.T) {
+	params := common.SearchParams{
+		Query:          "machine learning",
+		Title:          "Empirical Asset Pricing",
+		Author:         "Shihao Gu",
+		Journal:        "Review of Financial Studies",
+		Categories:     []string{"Finance", "Asset Pricing"},
+		YearRange:      "2020-2023",
+		Type:           "article",
+		OpenAccessOnly: true,
+		MinCitations:   100,
+		Offset:         4,
+		Limit:          8,
+		SortBy:         "citation_count",
+		SortOrder:      "desc",
+	}
+
+	searchParams := buildOpenAlexSearchParam(params)
+	if searchParams.Query != "machine learning Empirical Asset Pricing Shihao Gu Review of Financial Studies Finance Asset Pricing" {
+		t.Fatalf("expected OpenAlex query to preserve explicit and structured terms, got %q", searchParams.Query)
+	}
+	if searchParams.YearRange != params.YearRange || searchParams.Type != params.Type || !searchParams.OpenAccessOnly {
+		t.Fatalf("expected filters to be preserved: %+v", searchParams)
+	}
+	if searchParams.MinCitations != 100 || searchParams.Offset != 4 || searchParams.Limit != 8 || searchParams.SortBy != "citation_count" {
+		t.Fatalf("expected min citations, paging and sort to be preserved: %+v", searchParams)
+	}
+}
+
+func TestBuildOpenAlexSearchParamDerivesQueryForAuthorOnly(t *testing.T) {
+	searchParams := buildOpenAlexSearchParam(common.SearchParams{Author: "Harry Markowitz", Limit: 5})
+	if searchParams.Query != "Harry Markowitz" {
+		t.Fatalf("expected author-only query to be derived, got %q", searchParams.Query)
+	}
+}
+
 func TestBuildArxivSearchQuery(t *testing.T) {
 	t.Run("uses fielded clauses for structured filters", func(t *testing.T) {
 		params := common.SearchParams{

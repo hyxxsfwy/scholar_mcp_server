@@ -17,6 +17,7 @@
 - **arXiv**: 物理学、数学、计算机科学预印本 (免费)
 - **Semantic Scholar**: AI驱动的学术搜索引擎 (免费)
 - **Crossref**: 全球最大的DOI注册机构 (免费)
+- **OpenAlex**: 开放学术图谱，提供论文元数据、引用数与开放获取链接 (免费，默认启用)
 - **Scopus**: Elsevier学术数据库 (需要API密钥)
 - **ADSABS**: NASA天体物理学数据系统 (需要API密钥)
 - **Google Scholar**: 通过 SerpAPI 兼容第三方 SERP API 接入 (需要API密钥，默认关闭)
@@ -127,6 +128,9 @@ go run main.go logging.go
 # 设置API密钥
 export SCOPUS_API_KEY="your_scopus_api_key"
 export ADSABS_API_KEY="your_adsabs_api_key"
+
+# 可选：为 OpenAlex 配置邮箱以进入 polite pool；OpenAlex 默认启用，可用 ENABLE_OPENALEX=false 关闭
+export OPENALEX_EMAIL="your_email@example.com"
 
 # 可选：启用 Google Scholar (SerpAPI 兼容接口)
 export ENABLE_GOOGLE_SCHOLAR=true
