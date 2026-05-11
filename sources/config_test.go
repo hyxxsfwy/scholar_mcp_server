@@ -12,6 +12,17 @@ func TestParseProjectConfigJSONC(t *testing.T) {
     "http": true,
     "port": "9900",
   },
+	"enrichment": {
+		"enabled": true,
+		"top_n": 3,
+		"pdf_fallback": "open_access",
+		"prefetch_pdf": false,
+		"llm": {
+			"api_key": "config-key",
+			"base_url": "https://llm.example.com/v1",
+			"model": "deepseek-v4-flash"
+		}
+	},
   "sources": {
     "google_scholar": {
       "enabled": true,
@@ -34,6 +45,16 @@ func TestParseProjectConfigJSONC(t *testing.T) {
 	}
 	if !config.Server.HTTPDefault(false) || config.Server.PortDefault("8899") != "9900" {
 		t.Fatalf("expected server config to be parsed, got %+v", config.Server)
+	}
+
+	enrichment := defaultResultEnrichmentConfigFromEnv()
+	config.Enrichment.apply(&enrichment)
+	normalizeResultEnrichmentConfig(&enrichment)
+	if !enrichment.Enabled || enrichment.TopN != 3 || enrichment.PDFFallback != "open_access" || enrichment.PrefetchPDF {
+		t.Fatalf("expected enrichment config to be parsed, got %+v", enrichment)
+	}
+	if enrichment.LLM.APIKey != "config-key" || enrichment.LLM.BaseURL != "https://llm.example.com/v1" {
+		t.Fatalf("expected LLM config to be parsed, got %+v", enrichment.LLM)
 	}
 
 	google := config.Sources["google_scholar"]

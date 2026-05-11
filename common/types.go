@@ -34,10 +34,23 @@ type UnifiedPaper struct {
 	IsOpenAccess bool   `json:"is_open_access"` // 是否开放获取
 
 	// 附加信息
-	Type        string                 `json:"type"`         // 文档类型
-	Source      string                 `json:"source"`       // 数据源
-	ExternalIDs map[string]string      `json:"external_ids"` // 外部ID映射
-	Metadata    map[string]interface{} `json:"metadata"`     // 额外元数据
+	Type        string                 `json:"type"`                 // 文档类型
+	Source      string                 `json:"source"`               // 数据源
+	ExternalIDs map[string]string      `json:"external_ids"`         // 外部ID映射
+	Metadata    map[string]interface{} `json:"metadata"`             // 额外元数据
+	Enrichment  *PaperEnrichment       `json:"enrichment,omitempty"` // LLM生成的补充内容
+}
+
+// PaperEnrichment LLM生成的论文补充内容
+type PaperEnrichment struct {
+	Model         string   `json:"model"`
+	Content       string   `json:"content"`
+	GeneratedAt   string   `json:"generated_at"`
+	InputSources  []string `json:"input_sources"`
+	PDFPrefetched bool     `json:"pdf_prefetched"`
+	PDFSource     string   `json:"pdf_source,omitempty"`
+	PDFTextChars  int      `json:"pdf_text_chars"`
+	Error         string   `json:"error,omitempty"`
 }
 
 // UnifiedSearchResult 统一的搜索结果结构体

@@ -15,12 +15,14 @@ import (
 // UnifiedMCPHandler 统一MCP处理器
 type UnifiedMCPHandler struct {
 	aggregator *ScholarAggregator
+	enricher   *SearchResultEnricher
 }
 
 // NewUnifiedMCPHandler 创建统一MCP处理器
 func NewUnifiedMCPHandler() *UnifiedMCPHandler {
 	return &UnifiedMCPHandler{
 		aggregator: NewScholarAggregator(),
+		enricher:   NewConfiguredSearchResultEnricher(),
 	}
 }
 
@@ -28,6 +30,7 @@ func NewUnifiedMCPHandler() *UnifiedMCPHandler {
 func NewUnifiedMCPHandlerWithManager(manager *SourceManager) *UnifiedMCPHandler {
 	return &UnifiedMCPHandler{
 		aggregator: NewScholarAggregatorWithManager(manager),
+		enricher:   NewConfiguredSearchResultEnricher(),
 	}
 }
 
@@ -131,6 +134,7 @@ func (h *UnifiedMCPHandler) SearchScholarPapers(ctx context.Context, req *mcp.Ca
 		log.Printf("[ERROR] 聚合搜索失败: %v", err)
 		return nil, nil, fmt.Errorf("搜索失败: %w", err)
 	}
+	h.enricher.EnrichSearchResult(ctx, result)
 
 	// 格式化输出
 	resultText := h.formatAggregatedSearchResult(result, params)
@@ -239,6 +243,7 @@ func (h *UnifiedMCPHandler) SearchSourcePapers(ctx context.Context, req *mcp.Cal
 		log.Printf("[ERROR] %s搜索失败: %v", params.Source, err)
 		return nil, nil, fmt.Errorf("%s搜索失败: %w", params.Source, err)
 	}
+	h.enricher.EnrichPapers(ctx, papers)
 
 	// 格式化输出
 	resultText := h.formatSourceSearchResult(params.Source, papers, total, searchTime, params)

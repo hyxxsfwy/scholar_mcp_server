@@ -44,6 +44,7 @@ func formatPaperSearchEntry(index int, paper common.UnifiedPaper, includeSource 
 	writeOptionalTruncatedString(&builder, "   摘要: %s\n", paper.Abstract, abstractLimit)
 	writeOptionalString(&builder, "   链接: %s\n", paper.URL)
 	writeOptionalString(&builder, "   PDF: %s\n", paper.PDFURL)
+	writePaperEnrichmentSummary(&builder, paper.Enrichment, "   ")
 	builder.WriteString("\n")
 
 	return builder.String()
@@ -94,6 +95,7 @@ func formatPaperDetailBody(paper *common.UnifiedPaper, includeSource bool) strin
 	writePaperMetricsSection(&builder, paper)
 	writePaperClassificationSection(&builder, paper)
 	writePaperAbstractSection(&builder, paper)
+	writePaperEnrichmentDetail(&builder, paper.Enrichment)
 	writePaperExternalLinksSection(&builder, paper)
 
 	return builder.String()
@@ -134,6 +136,47 @@ func writePaperAbstractSection(builder *strings.Builder, paper *common.UnifiedPa
 	if paper.Abstract != "" {
 		builder.WriteString(fmt.Sprintf("\n📋 摘要:\n%s\n", paper.Abstract))
 	}
+}
+
+func writePaperEnrichmentSummary(builder *strings.Builder, enrichment *common.PaperEnrichment, prefix string) {
+	if enrichment == nil {
+		return
+	}
+	if enrichment.Error != "" && enrichment.Content == "" {
+		builder.WriteString(fmt.Sprintf("%sLLM梗概: 生成失败 (%s)\n", prefix, enrichment.Error))
+		return
+	}
+	if enrichment.Content == "" {
+		return
+	}
+
+	builder.WriteString(fmt.Sprintf("%sLLM文献大纲/梗概 (%s):\n", prefix, enrichment.Model))
+	builder.WriteString(indentMultiline(common.TruncateText(enrichment.Content, 1200), prefix+"  "))
+	builder.WriteString("\n")
+	if enrichment.Error != "" {
+		builder.WriteString(fmt.Sprintf("%sLLM补充说明: %s\n", prefix, enrichment.Error))
+	}
+}
+
+func writePaperEnrichmentDetail(builder *strings.Builder, enrichment *common.PaperEnrichment) {
+	if enrichment == nil {
+		return
+	}
+	builder.WriteString("\n🧠 LLM文献大纲/梗概:\n")
+	writeOptionalString(builder, "模型: %s\n", enrichment.Model)
+	writeOptionalJoined(builder, "输入来源: %s\n", enrichment.InputSources, 0)
+	if enrichment.PDFPrefetched {
+		pdfSource := enrichment.PDFSource
+		if pdfSource == "" {
+			pdfSource = "unknown"
+		}
+		builder.WriteString(fmt.Sprintf("PDF预取: 是，来源 %s，提取字符数 %d\n", pdfSource, enrichment.PDFTextChars))
+	}
+	if enrichment.Content != "" {
+		builder.WriteString(enrichment.Content)
+		builder.WriteString("\n")
+	}
+	writeOptionalString(builder, "补充说明: %s\n", enrichment.Error)
 }
 
 func writePaperExternalLinksSection(builder *strings.Builder, paper *common.UnifiedPaper) {
@@ -183,4 +226,12 @@ func writeOptionalTruncatedString(builder *strings.Builder, format, value string
 	if value != "" {
 		builder.WriteString(fmt.Sprintf(format, common.TruncateText(value, maxLen)))
 	}
+}
+
+func indentMultiline(text string, prefix string) string {
+	lines := strings.Split(strings.TrimSpace(text), "\n")
+	for index, line := range lines {
+		lines[index] = prefix + line
+	}
+	return strings.Join(lines, "\n")
 }

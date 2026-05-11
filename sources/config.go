@@ -6,15 +6,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
 const DefaultProjectConfigFile = "config.jsonc"
 
 type ProjectConfig struct {
-	Server  ServerConfig                 `json:"server"`
-	Request RequestConfig                `json:"request"`
-	Sources map[string]SourceConfigPatch `json:"sources"`
+	Server     ServerConfig                 `json:"server"`
+	Request    RequestConfig                `json:"request"`
+	Sources    map[string]SourceConfigPatch `json:"sources"`
+	Enrichment EnrichmentConfigPatch        `json:"enrichment"`
 }
 
 type ServerConfig struct {
@@ -39,6 +41,49 @@ type SourceConfigPatch struct {
 	RequestTimeout *int            `json:"request_timeout"`
 	MaxRetries     *int            `json:"max_retries"`
 	RateLimit      *int            `json:"rate_limit"`
+}
+
+type ResultEnrichmentConfig struct {
+	Enabled         bool
+	TopN            int
+	PrefetchPDF     bool
+	PDFFallback     string
+	MaxPDFBytes     int64
+	PDFTextMaxChars int
+	MaxInputChars   int
+	TimeoutSeconds  int
+	LLM             LLMConfig
+}
+
+type LLMConfig struct {
+	APIKey         string
+	BaseURL        string
+	Model          string
+	MaxTokens      int
+	Temperature    float64
+	MaxConcurrency int
+}
+
+type EnrichmentConfigPatch struct {
+	Enabled         *bool          `json:"enabled"`
+	TopN            *int           `json:"top_n"`
+	PrefetchPDF     *bool          `json:"prefetch_pdf"`
+	PDFFallback     *string        `json:"pdf_fallback"`
+	MaxPDFBytes     *int64         `json:"max_pdf_bytes"`
+	PDFTextMaxChars *int           `json:"pdf_text_max_chars"`
+	MaxInputChars   *int           `json:"max_input_chars"`
+	Timeout         *int           `json:"timeout"`
+	TimeoutSeconds  *int           `json:"timeout_seconds"`
+	LLM             LLMConfigPatch `json:"llm"`
+}
+
+type LLMConfigPatch struct {
+	APIKey         *string  `json:"api_key"`
+	BaseURL        *string  `json:"base_url"`
+	Model          *string  `json:"model"`
+	MaxTokens      *int     `json:"max_tokens"`
+	Temperature    *float64 `json:"temperature"`
+	MaxConcurrency *int     `json:"max_concurrency"`
 }
 
 func LoadProjectConfig() (*ProjectConfig, string, error) {
@@ -115,6 +160,133 @@ func (config ServerConfig) PortDefault(defaultValue string) string {
 		return defaultValue
 	}
 	return strings.TrimSpace(*config.Port)
+}
+
+func LoadResultEnrichmentConfig() ResultEnrichmentConfig {
+	config := defaultResultEnrichmentConfigFromEnv()
+	projectConfig, _, err := LoadProjectConfig()
+	if err == nil && projectConfig != nil {
+		projectConfig.Enrichment.apply(&config)
+	}
+
+	normalizeResultEnrichmentConfig(&config)
+	return config
+}
+
+func defaultResultEnrichmentConfigFromEnv() ResultEnrichmentConfig {
+	return ResultEnrichmentConfig{
+		Enabled:         boolEnv("ENABLE_RESULT_ENRICHMENT", false),
+		TopN:            intEnv("RESULT_ENRICHMENT_TOP_N", 5),
+		PrefetchPDF:     boolEnv("RESULT_ENRICHMENT_PREFETCH_PDF", true),
+		PDFFallback:     firstEnvValue("RESULT_ENRICHMENT_PDF_FALLBACK", "PDF_FALLBACK"),
+		MaxPDFBytes:     int64Env("RESULT_ENRICHMENT_MAX_PDF_BYTES", 10*1024*1024),
+		PDFTextMaxChars: intEnv("RESULT_ENRICHMENT_PDF_TEXT_MAX_CHARS", 12000),
+		MaxInputChars:   intEnv("RESULT_ENRICHMENT_MAX_INPUT_CHARS", 16000),
+		TimeoutSeconds:  intEnv("RESULT_ENRICHMENT_TIMEOUT", 60),
+		LLM: LLMConfig{
+			APIKey:         firstEnvValue("RESULT_ENRICHMENT_LLM_API_KEY", "LLM_API_KEY", "DEEPSEEK_API_KEY"),
+			BaseURL:        firstEnvValue("RESULT_ENRICHMENT_LLM_BASE_URL", "LLM_BASE_URL", "DEEPSEEK_BASE_URL"),
+			Model:          firstEnvValue("RESULT_ENRICHMENT_LLM_MODEL", "LLM_MODEL", "DEEPSEEK_MODEL"),
+			MaxTokens:      intEnv("RESULT_ENRICHMENT_LLM_MAX_TOKENS", 1200),
+			Temperature:    floatEnv("RESULT_ENRICHMENT_LLM_TEMPERATURE", 0.2),
+			MaxConcurrency: intEnv("RESULT_ENRICHMENT_LLM_MAX_CONCURRENCY", 5),
+		},
+	}
+}
+
+func (patch EnrichmentConfigPatch) apply(config *ResultEnrichmentConfig) {
+	if patch.Enabled != nil {
+		config.Enabled = *patch.Enabled
+	}
+	if patch.TopN != nil {
+		config.TopN = *patch.TopN
+	}
+	if patch.PrefetchPDF != nil {
+		config.PrefetchPDF = *patch.PrefetchPDF
+	}
+	if patch.PDFFallback != nil {
+		config.PDFFallback = *patch.PDFFallback
+	}
+	if patch.MaxPDFBytes != nil {
+		config.MaxPDFBytes = *patch.MaxPDFBytes
+	}
+	if patch.PDFTextMaxChars != nil {
+		config.PDFTextMaxChars = *patch.PDFTextMaxChars
+	}
+	if patch.MaxInputChars != nil {
+		config.MaxInputChars = *patch.MaxInputChars
+	}
+	if patch.Timeout != nil {
+		config.TimeoutSeconds = *patch.Timeout
+	}
+	if patch.TimeoutSeconds != nil {
+		config.TimeoutSeconds = *patch.TimeoutSeconds
+	}
+	patch.LLM.apply(&config.LLM)
+}
+
+func (patch LLMConfigPatch) apply(config *LLMConfig) {
+	if patch.APIKey != nil {
+		config.APIKey = *patch.APIKey
+	}
+	if patch.BaseURL != nil {
+		config.BaseURL = *patch.BaseURL
+	}
+	if patch.Model != nil {
+		config.Model = *patch.Model
+	}
+	if patch.MaxTokens != nil {
+		config.MaxTokens = *patch.MaxTokens
+	}
+	if patch.Temperature != nil {
+		config.Temperature = *patch.Temperature
+	}
+	if patch.MaxConcurrency != nil {
+		config.MaxConcurrency = *patch.MaxConcurrency
+	}
+}
+
+func normalizeResultEnrichmentConfig(config *ResultEnrichmentConfig) {
+	if config.TopN <= 0 {
+		config.TopN = 5
+	}
+	if config.TopN > 20 {
+		config.TopN = 20
+	}
+	config.PDFFallback = strings.ToLower(strings.TrimSpace(config.PDFFallback))
+	if config.PDFFallback == "" {
+		config.PDFFallback = "open_access"
+	}
+	if config.PDFFallback != "open_access" && config.PDFFallback != "none" {
+		config.PDFFallback = "open_access"
+	}
+	if config.MaxPDFBytes <= 0 {
+		config.MaxPDFBytes = 10 * 1024 * 1024
+	}
+	if config.PDFTextMaxChars <= 0 {
+		config.PDFTextMaxChars = 12000
+	}
+	if config.MaxInputChars <= 0 {
+		config.MaxInputChars = 16000
+	}
+	if config.TimeoutSeconds <= 0 {
+		config.TimeoutSeconds = 60
+	}
+	if strings.TrimSpace(config.LLM.BaseURL) == "" {
+		config.LLM.BaseURL = "https://api.deepseek.com/v1"
+	}
+	if strings.TrimSpace(config.LLM.Model) == "" {
+		config.LLM.Model = "deepseek-v4-flash"
+	}
+	if config.LLM.MaxTokens <= 0 {
+		config.LLM.MaxTokens = 1200
+	}
+	if config.LLM.MaxConcurrency <= 0 {
+		config.LLM.MaxConcurrency = 5
+	}
+	if strings.TrimSpace(config.LLM.APIKey) == "" {
+		config.Enabled = false
+	}
 }
 
 func (config RequestConfig) sourcePatch() *SourceConfigPatch {
@@ -389,4 +561,52 @@ func byteAt(content []byte, index int) byte {
 		return 0
 	}
 	return content[index]
+}
+
+func boolEnv(key string, defaultValue bool) bool {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return defaultValue
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		return defaultValue
+	}
+	return parsed
+}
+
+func intEnv(key string, defaultValue int) int {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return defaultValue
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return defaultValue
+	}
+	return parsed
+}
+
+func int64Env(key string, defaultValue int64) int64 {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return defaultValue
+	}
+	parsed, err := strconv.ParseInt(value, 10, 64)
+	if err != nil {
+		return defaultValue
+	}
+	return parsed
+}
+
+func floatEnv(key string, defaultValue float64) float64 {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return defaultValue
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return defaultValue
+	}
+	return parsed
 }
