@@ -30,16 +30,16 @@
     "prefetch_pdf": true,
     // none: 只使用结果自带 PDFURL；open_access: 自带 PDF 不可用时用 DOI 查询 OpenAlex 开放获取 PDF。
     "pdf_fallback": "open_access",
-    "max_pdf_bytes": 10485760,
-    "pdf_text_max_chars": 12000,
-    "max_input_chars": 16000,
-    "timeout": 60,
+    "max_pdf_bytes": 16777216, // 16MB
+    "pdf_text_max_chars": 15000,
+    "max_input_chars": 20000,
+    "timeout": 120,
     "llm": {
       // OpenAI Chat Completions 兼容接口。未配置 api_key 时，即使 enabled=true 也会自动关闭增强。
       // "api_key": "your_deepseek_or_openai_compatible_api_key",
       "base_url": "https://api.deepseek.com/v1",
       "model": "deepseek-v4-flash",
-      "max_tokens": 1200,
+      "max_tokens": 2048,
       "temperature": 0.2,
       "max_concurrency": 5
     }
