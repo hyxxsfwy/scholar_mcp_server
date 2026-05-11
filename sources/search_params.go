@@ -6,6 +6,7 @@ import (
 
 	"github.com/Seelly/scholar_mcp_server/common"
 	"github.com/Seelly/scholar_mcp_server/sources/adsabs"
+	"github.com/Seelly/scholar_mcp_server/sources/brokerresearch"
 	"github.com/Seelly/scholar_mcp_server/sources/crossref"
 	"github.com/Seelly/scholar_mcp_server/sources/googlescholar"
 	"github.com/Seelly/scholar_mcp_server/sources/scopus"
@@ -119,6 +120,27 @@ func buildGoogleScholarSearchParam(params common.SearchParams) *googlescholar.Go
 		Limit:     params.Limit,
 		SortBy:    params.SortBy,
 		SortOrder: params.SortOrder,
+	}
+}
+
+func buildBrokerResearchSearchParam(params common.SearchParams) *brokerresearch.SearchParam {
+	return &brokerresearch.SearchParam{
+		Query:          firstNonEmpty(params.Query, common.DeriveSearchQuery(params)),
+		Author:         params.Author,
+		Title:          params.Title,
+		Abstract:       params.Abstract,
+		Journal:        params.Journal,
+		Publisher:      params.Publisher,
+		Year:           params.Year,
+		YearRange:      params.YearRange,
+		Language:       params.Language,
+		Type:           params.Type,
+		Categories:     append([]string(nil), params.Categories...),
+		OpenAccessOnly: params.OpenAccessOnly,
+		Offset:         params.Offset,
+		Limit:          params.Limit,
+		SortBy:         params.SortBy,
+		SortOrder:      params.SortOrder,
 	}
 }
 

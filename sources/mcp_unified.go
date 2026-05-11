@@ -36,8 +36,13 @@ type ScholarSearchParam struct {
 	Query          string   `json:"query"`                      // 搜索关键词
 	Author         string   `json:"author,omitempty"`           // 作者筛选
 	Title          string   `json:"title,omitempty"`            // 标题筛选
+	Abstract       string   `json:"abstract,omitempty"`         // 摘要筛选
 	Journal        string   `json:"journal,omitempty"`          // 期刊筛选
+	Publisher      string   `json:"publisher,omitempty"`        // 出版商/机构筛选
 	Year           string   `json:"year,omitempty"`             // 年份筛选
+	YearRange      string   `json:"year_range,omitempty"`       // 年份范围筛选
+	Language       string   `json:"language,omitempty"`         // 语言筛选
+	Type           string   `json:"type,omitempty"`             // 文档类型筛选
 	Categories     []string `json:"categories,omitempty"`       // 分类筛选
 	MinCitations   int      `json:"min_citations,omitempty"`    // 最小引用数
 	OpenAccessOnly bool     `json:"open_access_only,omitempty"` // 仅开放获取
@@ -75,8 +80,13 @@ func (h *UnifiedMCPHandler) SearchScholarPapers(ctx context.Context, req *mcp.Ca
 		Query:          params.Query,
 		Author:         params.Author,
 		Title:          params.Title,
+		Abstract:       params.Abstract,
 		Journal:        params.Journal,
+		Publisher:      params.Publisher,
 		Year:           params.Year,
+		YearRange:      params.YearRange,
+		Language:       params.Language,
+		Type:           params.Type,
 		Categories:     params.Categories,
 		MinCitations:   params.MinCitations,
 		OpenAccessOnly: params.OpenAccessOnly,
@@ -191,8 +201,13 @@ func (h *UnifiedMCPHandler) SearchSourcePapers(ctx context.Context, req *mcp.Cal
 		Query:          params.Query,
 		Author:         params.Author,
 		Title:          params.Title,
+		Abstract:       params.Abstract,
 		Journal:        params.Journal,
+		Publisher:      params.Publisher,
 		Year:           params.Year,
+		YearRange:      params.YearRange,
+		Language:       params.Language,
+		Type:           params.Type,
 		Categories:     params.Categories,
 		MinCitations:   params.MinCitations,
 		OpenAccessOnly: params.OpenAccessOnly,

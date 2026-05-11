@@ -21,6 +21,7 @@
 - **Scopus**: Elsevier学术数据库 (需要API密钥)
 - **ADSABS**: NASA天体物理学数据系统 (需要API密钥)
 - **Google Scholar**: 通过 SerpAPI 兼容第三方 SERP API 接入 (需要API密钥，默认关闭)
+- **券商金工研报**: 通过用户授权的 JSON/RSS/Atom Feed 接入券商/研报平台数据 (默认关闭)
 - **Sci-Hub**: 学术论文PDF获取 (免费，但需注意法律风险)
 
 ## 可用工具
@@ -30,17 +31,22 @@
 从多个数据源同时搜索学术论文，自动合并去重并排序结果。
 
 **参数:**
-- `query` (string): 搜索关键词（必需）
+- `query` (string): 搜索关键词（可选；至少填写一个搜索词或筛选字段）
 - `author` (string): 作者筛选（可选）
 - `title` (string): 标题筛选（可选）
+- `abstract` (string): 摘要筛选（可选）
 - `journal` (string): 期刊筛选（可选）
+- `publisher` (string): 出版商/机构筛选（可选，券商研报可填写券商名称）
 - `year` (string): 年份筛选（可选，如"2020-2023"）
+- `year_range` (string): 年份范围筛选（可选，如"2020-2023"）
+- `language` (string): 语言筛选（可选）
+- `type` (string): 文档类型筛选（可选，如"research-report"）
 - `categories` ([]string): 分类筛选（可选）
 - `min_citations` (int): 最小引用数（可选）
 - `open_access_only` (bool): 仅开放获取（可选）
 - `offset` (int): 偏移量，默认 0
 - `limit` (int): 限制数量，默认 10，最大 100
-- `sort_by` (string): 排序方式（relevance, citation_count, published_date）
+- `sort_by` (string): 排序方式（relevance, citation_count, published_date, read_count, score）
 - `sort_order` (string): 排序顺序（asc, desc）
 - `enabled_sources` ([]string): 指定数据源（可选）
 
@@ -137,6 +143,31 @@ export ENABLE_GOOGLE_SCHOLAR=true
 export SERPAPI_API_KEY="your_serpapi_api_key"
 # 可选：使用自建或兼容网关
 # export SERPAPI_BASE_URL="https://serpapi.com/search.json"
+
+# 可选：启用券商金工研报源，仅配置你有权访问的公开或授权 Feed
+export ENABLE_BROKER_RESEARCH=true
+# 逗号分隔URL，支持 JSON/RSS/Atom；URL中可使用 {query}、{offset}、{limit}、{year}、{year_range} 占位符
+export BROKER_RESEARCH_FEEDS="https://example.com/research/quant.json?q={query}&offset={offset}&limit={limit}"
+# 如果 Feed 需要统一 Bearer Token
+export BROKER_RESEARCH_API_KEY="your_authorized_feed_token"
+
+# 也可以使用 JSON 配置多个券商/团队源
+export BROKER_RESEARCH_FEEDS='[
+  {
+    "name": "华泰证券金工",
+    "broker": "华泰证券",
+    "team": "金融工程",
+    "format": "json",
+    "url": "https://example.com/htsc/quant-reports.json?q={query}&limit={limit}"
+  },
+  {
+    "name": "中信证券金工RSS",
+    "broker": "中信证券",
+    "team": "金融工程",
+    "format": "rss",
+    "url": "https://example.com/citic/quant/rss.xml"
+  }
+]'
 
 # 运行服务器
 go run main.go logging.go

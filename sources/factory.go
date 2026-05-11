@@ -22,59 +22,56 @@ func (sf *SourceFactory) InitializeAllSources() *SourceManager {
 	// 从环境变量读取配置
 	configs := sf.loadConfigsFromEnv()
 
-	// 注册arXiv数据源
-	if configs["arxiv"].Enabled {
-		arxivSource := NewArxivSource(configs["arxiv"])
-		sf.manager.RegisterSource("arxiv", arxivSource, configs["arxiv"])
-	}
-
-	// 注册Semantic Scholar数据源
-	if configs["semantic_scholar"].Enabled {
-		ssSource := NewSemanticScholarSource(configs["semantic_scholar"])
-		sf.manager.RegisterSource("semantic_scholar", ssSource, configs["semantic_scholar"])
-	}
-
-	// 注册Crossref数据源
-	if configs["crossref"].Enabled {
-		crossrefSource := NewCrossrefSource(configs["crossref"])
-		sf.manager.RegisterSource("crossref", crossrefSource, configs["crossref"])
-	}
-
-	// 注册OpenAlex数据源
-	if configs["openalex"].Enabled {
-		openAlexSource := NewOpenAlexSource(configs["openalex"])
-		sf.manager.RegisterSource("openalex", openAlexSource, configs["openalex"])
-	}
-
-	// 注册Scopus数据源
-	if configs["scopus"].Enabled && configs["scopus"].APIKey != "" {
-		scopusSource := NewScopusSource(configs["scopus"])
-		if scopusSource != nil {
-			sf.manager.RegisterSource("scopus", scopusSource, configs["scopus"])
-		}
-	}
-
-	// 注册ADSABS数据源
-	if configs["adsabs"].Enabled && configs["adsabs"].APIKey != "" {
-		adsabsSource := NewAdsabsSource(configs["adsabs"])
-		if adsabsSource != nil {
-			sf.manager.RegisterSource("adsabs", adsabsSource, configs["adsabs"])
-		}
-	}
-
-	// 注册Google Scholar数据源 (SerpAPI兼容接口)
-	if configs["google_scholar"].Enabled && configs["google_scholar"].APIKey != "" {
-		googleScholarSource := NewGoogleScholarSource(configs["google_scholar"])
-		sf.manager.RegisterSource("google_scholar", googleScholarSource, configs["google_scholar"])
-	}
-
-	// 注册Sci-Hub数据源
-	if configs["scihub"].Enabled {
-		scihubSource := NewSciHubSource(configs["scihub"])
-		sf.manager.RegisterSource("scihub", scihubSource, configs["scihub"])
-	}
+	sf.registerEnabledSource("arxiv", configs["arxiv"], func(config SourceConfig) PaperSource { return NewArxivSource(config) })
+	sf.registerEnabledSource("semantic_scholar", configs["semantic_scholar"], func(config SourceConfig) PaperSource { return NewSemanticScholarSource(config) })
+	sf.registerEnabledSource("crossref", configs["crossref"], func(config SourceConfig) PaperSource { return NewCrossrefSource(config) })
+	sf.registerEnabledSource("openalex", configs["openalex"], func(config SourceConfig) PaperSource { return NewOpenAlexSource(config) })
+	sf.registerEnabledSource("scopus", configs["scopus"], newScopusPaperSource)
+	sf.registerEnabledSource("adsabs", configs["adsabs"], newAdsabsPaperSource)
+	sf.registerEnabledSource("google_scholar", configs["google_scholar"], newGoogleScholarPaperSource)
+	sf.registerEnabledSource("broker_research", configs["broker_research"], newBrokerResearchPaperSource)
+	sf.registerEnabledSource("scihub", configs["scihub"], func(config SourceConfig) PaperSource { return NewSciHubSource(config) })
 
 	return sf.manager
+}
+
+func (sf *SourceFactory) registerEnabledSource(name string, config SourceConfig, createSource func(SourceConfig) PaperSource) {
+	if !config.Enabled {
+		return
+	}
+
+	source := createSource(config)
+	if source != nil {
+		sf.manager.RegisterSource(name, source, config)
+	}
+}
+
+func newScopusPaperSource(config SourceConfig) PaperSource {
+	if config.APIKey == "" {
+		return nil
+	}
+	return NewScopusSource(config)
+}
+
+func newAdsabsPaperSource(config SourceConfig) PaperSource {
+	if config.APIKey == "" {
+		return nil
+	}
+	return NewAdsabsSource(config)
+}
+
+func newGoogleScholarPaperSource(config SourceConfig) PaperSource {
+	if config.APIKey == "" {
+		return nil
+	}
+	return NewGoogleScholarSource(config)
+}
+
+func newBrokerResearchPaperSource(config SourceConfig) PaperSource {
+	if config.BaseURL == "" {
+		return nil
+	}
+	return NewBrokerResearchSource(config)
 }
 
 // loadConfigsFromEnv 从环境变量加载配置
@@ -152,6 +149,16 @@ func (sf *SourceFactory) loadConfigsFromEnv() map[string]SourceConfig {
 		APIKey:         firstEnvValue("SERPAPI_API_KEY", "GOOGLE_SCHOLAR_API_KEY"),
 		BaseURL:        firstEnvValue("SERPAPI_BASE_URL", "GOOGLE_SCHOLAR_BASE_URL"),
 		Enabled:        getBoolEnv("ENABLE_GOOGLE_SCHOLAR", false), // 默认关闭，需要第三方SERP API密钥
+		RequestTimeout: defaultTimeout,
+		MaxRetries:     defaultRetries,
+		RateLimit:      2,
+	}
+
+	// 券商金工研报配置。仅接入用户有权访问的JSON/RSS/Atom源。
+	configs["broker_research"] = SourceConfig{
+		APIKey:         os.Getenv("BROKER_RESEARCH_API_KEY"),
+		BaseURL:        os.Getenv("BROKER_RESEARCH_FEEDS"),
+		Enabled:        getBoolEnv("ENABLE_BROKER_RESEARCH", false),
 		RequestTimeout: defaultTimeout,
 		MaxRetries:     defaultRetries,
 		RateLimit:      2,

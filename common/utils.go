@@ -469,7 +469,7 @@ func isValidYear(year string) bool {
 func isValidSortField(field string) bool {
 	validFields := []string{
 		"relevance", "date", "published_date", "citation_count", "citations",
-		"read_count", "title", "author", "journal",
+		"read_count", "score", "title", "author", "journal",
 	}
 	for _, valid := range validFields {
 		if field == valid {

@@ -202,6 +202,30 @@ func TestBuildOpenAlexSearchParamDerivesQueryForAuthorOnly(t *testing.T) {
 	}
 }
 
+func TestBuildBrokerResearchSearchParam(t *testing.T) {
+	params := common.SearchParams{
+		Title:      "多因子选股周报",
+		Author:     "华泰金工团队",
+		Publisher:  "华泰证券",
+		YearRange:  "2022-2024",
+		Categories: []string{"金融工程", "多因子"},
+		Type:       "research-report",
+		Offset:     2,
+		Limit:      6,
+	}
+
+	searchParams := buildBrokerResearchSearchParam(params)
+	if searchParams.Query != "多因子选股周报 华泰金工团队 华泰证券 金融工程 多因子" {
+		t.Fatalf("expected structured terms to derive broker research query, got %q", searchParams.Query)
+	}
+	if searchParams.Publisher != params.Publisher || searchParams.YearRange != params.YearRange || searchParams.Type != params.Type {
+		t.Fatalf("expected broker research filters to be preserved: %+v", searchParams)
+	}
+	if !reflect.DeepEqual(searchParams.Categories, params.Categories) || searchParams.Offset != 2 || searchParams.Limit != 6 {
+		t.Fatalf("expected categories and paging to be preserved: %+v", searchParams)
+	}
+}
+
 func TestBuildArxivSearchQuery(t *testing.T) {
 	t.Run("uses fielded clauses for structured filters", func(t *testing.T) {
 		params := common.SearchParams{

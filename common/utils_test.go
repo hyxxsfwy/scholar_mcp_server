@@ -20,6 +20,7 @@ func TestValidateSearchParams(t *testing.T) {
 		{"negative limit", SearchParams{Query: "test", Limit: -1}, true, "limit"},
 		{"limit too large", SearchParams{Query: "test", Limit: 1001}, true, "limit"},
 		{"invalid sort field", SearchParams{Query: "test", SortBy: "citations"}, false, ""},
+		{"valid score sort field", SearchParams{Query: "test", SortBy: "score"}, false, ""},
 		{"invalid sort field bad", SearchParams{Query: "test", SortBy: "unknown_field"}, true, "sort_by"},
 		{"invalid sort order", SearchParams{Query: "test", SortOrder: "random"}, true, "sort_order"},
 		{"valid year", SearchParams{Query: "test", Year: "2020"}, false, ""},
