@@ -126,50 +126,69 @@ go mod tidy
 go run main.go logging.go
 ```
 
+### 配置文件
+
+项目根目录提供 [config.jsonc](config.jsonc)，支持 `//`、`/* ... */` 注释和尾随逗号。程序会先读取环境变量，再用 `config.jsonc` 中实际写出的字段覆盖环境变量；未写出的字段仍会回退到环境变量或内置默认值。
+
+配置文件包含三类配置：
+
+- `server`: 默认运行模式和 HTTP 端口。命令行参数 `--http`、`--port` 会覆盖这里的默认值。
+- `request`: 全局请求超时、重试次数和可选统一限速。
+- `sources`: 各数据源的启用状态、API key、邮箱、base URL、限速，以及券商研报 feed。
+
+常用配置示例：
+
+```jsonc
+{
+  "server": {
+    "http": true,
+    "port": "8899"
+  },
+  "request": {
+    "timeout": 30,
+    "max_retries": 3
+  },
+  "sources": {
+    "openalex": {
+      "enabled": true,
+      "email": "your_email@example.com"
+    },
+    "google_scholar": {
+      "enabled": true,
+      "api_key": "your_serpapi_api_key",
+      "base_url": "https://serpapi.com/search.json"
+    },
+    "broker_research": {
+      "enabled": true,
+      "api_key": "your_authorized_feed_token",
+      "feeds": [
+        {
+          "name": "华泰证券金工",
+          "broker": "华泰证券",
+          "team": "金融工程",
+          "format": "json",
+          "url": "https://example.com/htsc/quant-reports.json?q={query}&limit={limit}"
+        },
+        {
+          "name": "中信证券金工RSS",
+          "broker": "中信证券",
+          "team": "金融工程",
+          "format": "rss",
+          "url": "https://example.com/citic/quant/rss.xml"
+        }
+      ]
+    }
+  }
+}
+```
+
+兼容的环境变量仍然可用：`REQUEST_TIMEOUT`、`SCOPUS_API_KEY`、`ADSABS_API_KEY`、`OPENALEX_EMAIL`、`CROSSREF_EMAIL`、`SERPAPI_API_KEY`、`GOOGLE_SCHOLAR_API_KEY`、`BROKER_RESEARCH_API_KEY`、`BROKER_RESEARCH_FEEDS`，以及各 `ENABLE_*` 开关。只要同名配置字段写在 [config.jsonc](config.jsonc) 中，配置文件优先。
+
 ### 完整功能运行
 
-配置API密钥以启用全部功能：
+编辑 [config.jsonc](config.jsonc) 后运行服务器：
 
 ```bash
-# 设置API密钥
-export SCOPUS_API_KEY="your_scopus_api_key"
-export ADSABS_API_KEY="your_adsabs_api_key"
-
-# 可选：为 OpenAlex 配置邮箱以进入 polite pool；OpenAlex 默认启用，可用 ENABLE_OPENALEX=false 关闭
-export OPENALEX_EMAIL="your_email@example.com"
-
-# 可选：启用 Google Scholar (SerpAPI 兼容接口)
-export ENABLE_GOOGLE_SCHOLAR=true
-export SERPAPI_API_KEY="your_serpapi_api_key"
-# 可选：使用自建或兼容网关
-# export SERPAPI_BASE_URL="https://serpapi.com/search.json"
-
-# 可选：启用券商金工研报源，仅配置你有权访问的公开或授权 Feed
-export ENABLE_BROKER_RESEARCH=true
-# 逗号分隔URL，支持 JSON/RSS/Atom；URL中可使用 {query}、{offset}、{limit}、{year}、{year_range} 占位符
-export BROKER_RESEARCH_FEEDS="https://example.com/research/quant.json?q={query}&offset={offset}&limit={limit}"
-# 如果 Feed 需要统一 Bearer Token
-export BROKER_RESEARCH_API_KEY="your_authorized_feed_token"
-
-# 也可以使用 JSON 配置多个券商/团队源
-export BROKER_RESEARCH_FEEDS='[
-  {
-    "name": "华泰证券金工",
-    "broker": "华泰证券",
-    "team": "金融工程",
-    "format": "json",
-    "url": "https://example.com/htsc/quant-reports.json?q={query}&limit={limit}"
-  },
-  {
-    "name": "中信证券金工RSS",
-    "broker": "中信证券",
-    "team": "金融工程",
-    "format": "rss",
-    "url": "https://example.com/citic/quant/rss.xml"
-  }
-]'
-
-# 运行服务器
 go run main.go logging.go
 ```
 

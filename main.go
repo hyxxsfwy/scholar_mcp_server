@@ -45,8 +45,19 @@ func sciHubPDFToMarkdown(ctx context.Context, req *mcp.CallToolRequest, params *
 }
 
 func main() {
-	httpMode := flag.Bool("http", false, "Run as HTTP server instead of stdio transport")
-	port := flag.String("port", "8899", "HTTP server port (only used with --http)")
+	defaultHTTPMode := false
+	defaultPort := "8899"
+	projectConfig, configPath, err := sourcehandlers.LoadProjectConfig()
+	if err != nil {
+		log.Fatalf("Failed to load config %s: %v", configPath, err)
+	}
+	if projectConfig != nil {
+		defaultHTTPMode = projectConfig.Server.HTTPDefault(defaultHTTPMode)
+		defaultPort = projectConfig.Server.PortDefault(defaultPort)
+	}
+
+	httpMode := flag.Bool("http", defaultHTTPMode, "Run as HTTP server instead of stdio transport")
+	port := flag.String("port", defaultPort, "HTTP server port (only used with --http)")
 	flag.Parse()
 
 	if *httpMode {

@@ -1,6 +1,7 @@
 package sources
 
 import (
+	"log"
 	"os"
 	"strconv"
 )
@@ -19,8 +20,7 @@ func NewSourceFactory() *SourceFactory {
 
 // InitializeAllSources 初始化所有数据源
 func (sf *SourceFactory) InitializeAllSources() *SourceManager {
-	// 从环境变量读取配置
-	configs := sf.loadConfigsFromEnv()
+	configs := sf.loadConfigs()
 
 	sf.registerEnabledSource("arxiv", configs["arxiv"], func(config SourceConfig) PaperSource { return NewArxivSource(config) })
 	sf.registerEnabledSource("semantic_scholar", configs["semantic_scholar"], func(config SourceConfig) PaperSource { return NewSemanticScholarSource(config) })
@@ -33,6 +33,25 @@ func (sf *SourceFactory) InitializeAllSources() *SourceManager {
 	sf.registerEnabledSource("scihub", configs["scihub"], func(config SourceConfig) PaperSource { return NewSciHubSource(config) })
 
 	return sf.manager
+}
+
+func (sf *SourceFactory) loadConfigs() map[string]SourceConfig {
+	configs := sf.loadConfigsFromEnv()
+
+	projectConfig, configPath, err := LoadProjectConfig()
+	if err != nil {
+		log.Printf("[WARN] 读取配置文件失败: %v", err)
+		return configs
+	}
+	if projectConfig == nil {
+		return configs
+	}
+	if err := projectConfig.ApplyToSourceConfigs(configs); err != nil {
+		log.Printf("[WARN] 应用配置文件 %s 失败: %v", configPath, err)
+		return configs
+	}
+
+	return configs
 }
 
 func (sf *SourceFactory) registerEnabledSource(name string, config SourceConfig, createSource func(SourceConfig) PaperSource) {

@@ -1,0 +1,102 @@
+{
+  // 项目配置文件。程序会先读取环境变量，再用本文件中“实际写出的字段”覆盖环境变量。
+  // 如果你希望某项继续使用环境变量，请删除或注释掉对应字段。
+
+  "server": {
+    // true: HTTP Streamable transport；false: stdio transport。
+    // 命令行参数 --http 会覆盖这里的默认值。
+    "http": false,
+
+    // HTTP 模式监听端口。命令行参数 --port 会覆盖这里的默认值。
+    "port": "8899"
+  },
+
+  "request": {
+    // 全局请求超时，单位秒。等价于环境变量 REQUEST_TIMEOUT，但优先级更高。
+    "timeout": 30,
+
+    // 全局重试次数，会作为各数据源默认值。
+    "max_retries": 3
+
+    // 如需统一覆盖所有数据源限速，可启用该字段；默认保留各源自己的 rate_limit。
+    // "rate_limit": 10
+  },
+
+  "sources": {
+    "arxiv": {
+      "enabled": true,
+      "rate_limit": 10
+    },
+
+    "semantic_scholar": {
+      "enabled": true,
+      "rate_limit": 10
+      // "api_key": "your_semantic_scholar_api_key"
+    },
+
+    "crossref": {
+      "enabled": true,
+      "rate_limit": 10
+      // Crossref 使用邮箱作为 polite 标识；未配置时仍可使用 CROSSREF_EMAIL。
+      // "email": "your_email@example.com"
+    },
+
+    "openalex": {
+      "enabled": true,
+      "rate_limit": 10
+      // OpenAlex 使用邮箱进入 polite pool；未配置时仍可使用 OPENALEX_EMAIL 或 CROSSREF_EMAIL。
+      // "email": "your_email@example.com",
+      // "base_url": "https://api.openalex.org/works"
+    },
+
+    "scopus": {
+      "enabled": false,
+      "rate_limit": 5
+      // "api_key": "your_scopus_api_key"
+    },
+
+    "adsabs": {
+      "enabled": false,
+      "rate_limit": 10
+      // "api_key": "your_adsabs_api_key"
+    },
+
+    "google_scholar": {
+      "enabled": false,
+      "rate_limit": 2
+      // SerpAPI 兼容接口配置；未配置时仍可使用 SERPAPI_API_KEY / GOOGLE_SCHOLAR_API_KEY。
+      // "api_key": "your_serpapi_api_key",
+      // "base_url": "https://serpapi.com/search.json"
+    },
+
+    "broker_research": {
+      "enabled": false,
+      "rate_limit": 2
+      // 仅配置你有权访问的公开或授权 JSON/RSS/Atom feed。
+      // feeds 可以是字符串 URL、逗号分隔 URL，或数组/对象；数组/对象会被压缩为 JSON 传给数据源。
+      // URL 支持 {query}、{offset}、{limit}、{year}、{year_range} 占位符。
+      // "api_key": "your_authorized_feed_token",
+      // "feeds": [
+      //   {
+      //     "name": "华泰证券金工",
+      //     "broker": "华泰证券",
+      //     "team": "金融工程",
+      //     "format": "json",
+      //     "url": "https://example.com/htsc/quant-reports.json?q={query}&limit={limit}"
+      //   },
+      //   {
+      //     "name": "中信证券金工RSS",
+      //     "broker": "中信证券",
+      //     "team": "金融工程",
+      //     "format": "rss",
+      //     "url": "https://example.com/citic/quant/rss.xml"
+      //   }
+      // ]
+    },
+
+    "scihub": {
+      "enabled": true,
+      "rate_limit": 3
+    }
+  }
+}
