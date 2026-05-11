@@ -277,7 +277,7 @@ func normalizeResultEnrichmentConfig(config *ResultEnrichmentConfig) {
 	if config.PDFFallback == "" {
 		config.PDFFallback = "open_access"
 	}
-	if config.PDFFallback != "open_access" && config.PDFFallback != "none" {
+	if config.PDFFallback != "open_access" && config.PDFFallback != "none" && config.PDFFallback != "scihub" {
 		config.PDFFallback = "open_access"
 	}
 	if config.MaxPDFBytes <= 0 {

@@ -15,6 +15,7 @@ import (
 
 	"github.com/Seelly/scholar_mcp_server/common"
 	openalexapi "github.com/Seelly/scholar_mcp_server/sources/openalex"
+	scihubapi "github.com/Seelly/scholar_mcp_server/sources/scihub"
 	"github.com/ledongthuc/pdf"
 )
 
@@ -99,18 +100,29 @@ func (enricher *SearchResultEnricher) enrichPaper(ctx context.Context, paper com
 
 	pdfText, pdfPrefetched, pdfSource, pdfErr := enricher.fetchPDFText(paperCtx, paper)
 	inputSources := enrichmentInputSources(paper, pdfText)
-	prompt := buildPaperEnrichmentPrompt(paper, pdfText, enricher.config.MaxInputChars)
-	content, llmErr := enricher.llmClient.Generate(paperCtx, prompt)
 
 	enrichment := &common.PaperEnrichment{
 		Model:         enricher.config.LLM.Model,
-		Content:       strings.TrimSpace(content),
 		GeneratedAt:   time.Now().Format(time.RFC3339),
 		InputSources:  inputSources,
 		PDFPrefetched: pdfPrefetched,
 		PDFSource:     pdfSource,
 		PDFTextChars:  len(pdfText),
 	}
+
+	// No abstract and no PDF text: skip LLM to avoid hallucinated output.
+	if len(inputSources) == 1 && inputSources[0] == "metadata" {
+		msg := "跳过LLM生成：无可用摘要和PDF内容"
+		if pdfErr != nil {
+			msg += "（PDF获取失败: " + pdfErr.Error() + "）"
+		}
+		enrichment.Error = msg
+		return enrichment
+	}
+
+	prompt := buildPaperEnrichmentPrompt(paper, pdfText, enricher.config.MaxInputChars)
+	content, llmErr := enricher.llmClient.Generate(paperCtx, prompt)
+	enrichment.Content = strings.TrimSpace(content)
 	if llmErr != nil {
 		enrichment.Error = llmErr.Error()
 	} else if pdfErr != nil {
@@ -165,12 +177,29 @@ func (enricher *SearchResultEnricher) pdfCandidates(ctx context.Context, paper c
 	if strings.TrimSpace(paper.PDFURL) != "" {
 		candidates = append(candidates, pdfCandidate{URL: paper.PDFURL, Source: "result_pdf_url"})
 	}
-	if enricher.config.PDFFallback == "open_access" {
+	switch enricher.config.PDFFallback {
+	case "open_access", "scihub":
 		if fallbackURL := enricher.resolveOpenAccessPDFURL(ctx, paper); fallbackURL != "" && fallbackURL != strings.TrimSpace(paper.PDFURL) {
 			candidates = append(candidates, pdfCandidate{URL: fallbackURL, Source: "openalex_open_access"})
 		}
+		if enricher.config.PDFFallback == "scihub" {
+			if doi := paperDOI(paper); doi != "" {
+				if sciHubURL := enricher.resolveSciHubPDFURL(ctx, doi); sciHubURL != "" {
+					candidates = append(candidates, pdfCandidate{URL: sciHubURL, Source: "scihub"})
+				}
+			}
+		}
 	}
 	return candidates
+}
+
+func (enricher *SearchResultEnricher) resolveSciHubPDFURL(ctx context.Context, doi string) string {
+	client := scihubapi.NewSciHubClient()
+	response, err := client.GetPDFURL(ctx, doi)
+	if err != nil || !response.Success || strings.TrimSpace(response.PDFURL) == "" {
+		return ""
+	}
+	return strings.TrimSpace(response.PDFURL)
 }
 
 func (enricher *SearchResultEnricher) fetchPDFCandidateText(ctx context.Context, candidate pdfCandidate) (string, error) {

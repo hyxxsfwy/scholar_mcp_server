@@ -28,8 +28,8 @@
     "enabled": true,
     "top_n": 3,
     "prefetch_pdf": true,
-    // none: 只使用结果自带 PDFURL；open_access: 自带 PDF 不可用时用 DOI 查询 OpenAlex 开放获取 PDF。
-    "pdf_fallback": "open_access",
+    // none: 只用结果自带 PDFURL；open_access: 追加 OpenAlex 开放获取兜底；scihub: open_access 基础上再追加 Sci-Hub 兜底。
+    "pdf_fallback": "scihub",
     "max_pdf_bytes": 16777216, // 16MB
     "pdf_text_max_chars": 15000,
     "max_input_chars": 20000,

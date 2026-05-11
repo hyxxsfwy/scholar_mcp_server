@@ -108,6 +108,44 @@ func TestSearchResultEnricherDisabledWithoutAPIKey(t *testing.T) {
 	}
 }
 
+func TestSearchResultEnricherSkipsLLMWithNoContent(t *testing.T) {
+	var requestCount int32
+	server := newEnrichmentLLMTestServer(t, &requestCount)
+	defer server.Close()
+
+	enricher := NewSearchResultEnricher(ResultEnrichmentConfig{
+		Enabled:        true,
+		TopN:           3,
+		PrefetchPDF:    false,
+		TimeoutSeconds: 5,
+		LLM: LLMConfig{
+			APIKey:  "test-key",
+			BaseURL: server.URL,
+			Model:   "deepseek-v4-flash",
+		},
+	})
+
+	// Paper with no abstract and no PDF URL: LLM must NOT be called.
+	papers := []common.UnifiedPaper{
+		{Title: "No Content Paper", Abstract: "", PDFURL: ""},
+	}
+	enricher.EnrichPapers(context.Background(), papers)
+
+	if requestCount != 0 {
+		t.Fatalf("expected no LLM calls for metadata-only paper, got %d", requestCount)
+	}
+	enrichment := papers[0].Enrichment
+	if enrichment == nil {
+		t.Fatalf("expected enrichment to be set (with error), got nil")
+	}
+	if !strings.Contains(enrichment.Error, "跳过LLM生成") {
+		t.Fatalf("expected skip error message, got %q", enrichment.Error)
+	}
+	if strings.TrimSpace(enrichment.Content) != "" {
+		t.Fatalf("expected empty content for skipped enrichment, got %q", enrichment.Content)
+	}
+}
+
 func TestFirstOpenAlexResolvedPDFURLUsesOpenAccessLocation(t *testing.T) {
 	paper := openalexapi.Paper{
 		PrimaryLocation: openalexapi.Location{IsOA: false, PDFURL: "https://closed.example.com/paper.pdf"},
