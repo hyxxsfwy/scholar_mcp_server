@@ -9,28 +9,7 @@ import (
 
 func TestSearchPapersWithParams(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
-		queryValues := request.URL.Query()
-		if queryValues.Get("engine") != "google_scholar" {
-			t.Fatalf("expected google_scholar engine, got %q", queryValues.Get("engine"))
-		}
-		if queryValues.Get("api_key") != "test-key" {
-			t.Fatalf("expected api key to be sent")
-		}
-		if queryValues.Get("q") != "quantitative finance" {
-			t.Fatalf("expected query to be preserved, got %q", queryValues.Get("q"))
-		}
-		if queryValues.Get("as_sauthors") != "Shihao Gu" {
-			t.Fatalf("expected author filter, got %q", queryValues.Get("as_sauthors"))
-		}
-		if queryValues.Get("as_publication") != "Review of Financial Studies" {
-			t.Fatalf("expected publication filter, got %q", queryValues.Get("as_publication"))
-		}
-		if queryValues.Get("as_ylo") != "2020" || queryValues.Get("as_yhi") != "2023" {
-			t.Fatalf("expected year range filter, got %q-%q", queryValues.Get("as_ylo"), queryValues.Get("as_yhi"))
-		}
-		if queryValues.Get("scisbd") != "1" {
-			t.Fatalf("expected date sort flag")
-		}
+		assertSearchRequest(t, request)
 
 		responseWriter.Header().Set("Content-Type", "application/json")
 		_, _ = responseWriter.Write([]byte(`{
@@ -67,6 +46,23 @@ func TestSearchPapersWithParams(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchPapersWithParams failed: %v", err)
 	}
+	assertSearchResult(t, result)
+}
+
+func assertSearchRequest(t *testing.T, request *http.Request) {
+	t.Helper()
+	assertQueryValue(t, request, "engine", "google_scholar")
+	assertQueryValue(t, request, "api_key", "test-key")
+	assertQueryValue(t, request, "q", "quantitative finance")
+	assertQueryValue(t, request, "as_sauthors", "Shihao Gu")
+	assertQueryValue(t, request, "as_publication", "Review of Financial Studies")
+	assertQueryValue(t, request, "as_ylo", "2020")
+	assertQueryValue(t, request, "as_yhi", "2023")
+	assertQueryValue(t, request, "scisbd", "1")
+}
+
+func assertSearchResult(t *testing.T, result *SearchResult) {
+	t.Helper()
 	if result.Total != 123 {
 		t.Fatalf("expected total 123, got %d", result.Total)
 	}
@@ -75,6 +71,13 @@ func TestSearchPapersWithParams(t *testing.T) {
 	}
 	if len(result.Papers) != 1 || result.Papers[0].Title != "Empirical Asset Pricing via Machine Learning" {
 		t.Fatalf("unexpected papers: %+v", result.Papers)
+	}
+}
+
+func assertQueryValue(t *testing.T, request *http.Request, key, expected string) {
+	t.Helper()
+	if actual := request.URL.Query().Get(key); actual != expected {
+		t.Fatalf("expected query parameter %s=%q, got %q", key, expected, actual)
 	}
 }
 

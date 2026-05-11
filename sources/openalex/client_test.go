@@ -10,25 +10,7 @@ import (
 
 func TestSearchPapersWithParams(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(responseWriter http.ResponseWriter, request *http.Request) {
-		queryValues := request.URL.Query()
-		if queryValues.Get("search") != "quantitative finance" {
-			t.Fatalf("expected search query, got %q", queryValues.Get("search"))
-		}
-		if queryValues.Get("mailto") != "test@example.com" {
-			t.Fatalf("expected mailto polite pool parameter")
-		}
-		if queryValues.Get("per-page") != "20" || queryValues.Get("page") != "1" {
-			t.Fatalf("expected paging parameters, got page=%q per-page=%q", queryValues.Get("page"), queryValues.Get("per-page"))
-		}
-		filter := queryValues.Get("filter")
-		for _, expected := range []string{"from_publication_date:2020-01-01", "to_publication_date:2023-12-31", "type:article", "is_oa:true", "cited_by_count:>100"} {
-			if !strings.Contains(filter, expected) {
-				t.Fatalf("expected filter %q in %q", expected, filter)
-			}
-		}
-		if queryValues.Get("sort") != "cited_by_count:desc" {
-			t.Fatalf("expected citation sort, got %q", queryValues.Get("sort"))
-		}
+		assertSearchRequest(t, request)
 
 		responseWriter.Header().Set("Content-Type", "application/json")
 		_, _ = responseWriter.Write([]byte(`{
@@ -60,11 +42,45 @@ func TestSearchPapersWithParams(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SearchPapersWithParams failed: %v", err)
 	}
+	assertSearchResult(t, result)
+}
+
+func assertSearchRequest(t *testing.T, request *http.Request) {
+	t.Helper()
+	assertQueryValue(t, request, "search", "quantitative finance")
+	assertQueryValue(t, request, "mailto", "test@example.com")
+	assertQueryValue(t, request, "per-page", "20")
+	assertQueryValue(t, request, "page", "1")
+	assertQueryValue(t, request, "sort", "cited_by_count:desc")
+	assertFilterContains(t, request, "from_publication_date:2020-01-01")
+	assertFilterContains(t, request, "to_publication_date:2023-12-31")
+	assertFilterContains(t, request, "type:article")
+	assertFilterContains(t, request, "is_oa:true")
+	assertFilterContains(t, request, "cited_by_count:>100")
+}
+
+func assertSearchResult(t *testing.T, result *SearchResult) {
+	t.Helper()
 	if result.Total != 123 || len(result.Papers) != 1 {
 		t.Fatalf("expected one result with total 123, got total=%d len=%d", result.Total, len(result.Papers))
 	}
 	if result.Papers[0].DisplayName != "Empirical Asset Pricing via Machine Learning" {
 		t.Fatalf("unexpected paper: %+v", result.Papers[0])
+	}
+}
+
+func assertQueryValue(t *testing.T, request *http.Request, key, expected string) {
+	t.Helper()
+	if actual := request.URL.Query().Get(key); actual != expected {
+		t.Fatalf("expected query parameter %s=%q, got %q", key, expected, actual)
+	}
+}
+
+func assertFilterContains(t *testing.T, request *http.Request, expected string) {
+	t.Helper()
+	filter := request.URL.Query().Get("filter")
+	if !strings.Contains(filter, expected) {
+		t.Fatalf("expected filter %q in %q", expected, filter)
 	}
 }
 
