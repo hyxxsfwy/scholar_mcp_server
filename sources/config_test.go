@@ -1,7 +1,10 @@
 package sources
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 )
 
@@ -142,4 +145,78 @@ func TestProjectConfigCanLeaveSecretsOnEnv(t *testing.T) {
 	if scopus.RateLimit != 4 {
 		t.Fatalf("expected source config to override rate limit, got %+v", scopus)
 	}
+}
+
+func TestLoadDotEnvLoadsMissingValues(t *testing.T) {
+	resetDotEnvLoaderForTest(t)
+	tempDir := t.TempDir()
+	t.Chdir(tempDir)
+	t.Setenv("DOTENV_EXISTING_VALUE", "from-env")
+	t.Cleanup(func() {
+		os.Unsetenv("DOTENV_LLM_KEY")
+		os.Unsetenv("DOTENV_QUOTED_VALUE")
+		os.Unsetenv("DOTENV_SINGLE_QUOTED_VALUE")
+	})
+
+	content := []byte(`
+# comment
+DOTENV_LLM_KEY=from-dotenv
+DOTENV_EXISTING_VALUE=from-dotenv
+export DOTENV_QUOTED_VALUE="hello\nworld" # trailing comment
+DOTENV_SINGLE_QUOTED_VALUE='literal value'
+`)
+	if err := os.WriteFile(filepath.Join(tempDir, DefaultDotEnvFile), content, 0o600); err != nil {
+		t.Fatalf("write .env failed: %v", err)
+	}
+
+	if err := LoadDotEnv(); err != nil {
+		t.Fatalf("LoadDotEnv failed: %v", err)
+	}
+	if got := os.Getenv("DOTENV_LLM_KEY"); got != "from-dotenv" {
+		t.Fatalf("expected dotenv value, got %q", got)
+	}
+	if got := os.Getenv("DOTENV_EXISTING_VALUE"); got != "from-env" {
+		t.Fatalf("expected existing env to win, got %q", got)
+	}
+	if got := os.Getenv("DOTENV_QUOTED_VALUE"); got != "hello\nworld" {
+		t.Fatalf("expected quoted value to unescape, got %q", got)
+	}
+	if got := os.Getenv("DOTENV_SINGLE_QUOTED_VALUE"); got != "literal value" {
+		t.Fatalf("expected single quoted value, got %q", got)
+	}
+}
+
+func TestLoadResultEnrichmentConfigReadsDotEnv(t *testing.T) {
+	resetDotEnvLoaderForTest(t)
+	tempDir := t.TempDir()
+	t.Chdir(tempDir)
+	t.Cleanup(func() {
+		os.Unsetenv("ENABLE_RESULT_ENRICHMENT")
+		os.Unsetenv("RESULT_ENRICHMENT_LLM_API_KEY")
+		os.Unsetenv("RESULT_ENRICHMENT_TOP_N")
+	})
+
+	content := []byte(`
+ENABLE_RESULT_ENRICHMENT=true
+RESULT_ENRICHMENT_LLM_API_KEY=from-dotenv
+RESULT_ENRICHMENT_TOP_N=2
+`)
+	if err := os.WriteFile(filepath.Join(tempDir, DefaultDotEnvFile), content, 0o600); err != nil {
+		t.Fatalf("write .env failed: %v", err)
+	}
+
+	config := LoadResultEnrichmentConfig()
+	if !config.Enabled || config.TopN != 2 || config.LLM.APIKey != "from-dotenv" {
+		t.Fatalf("expected enrichment config from .env, got %+v", config)
+	}
+}
+
+func resetDotEnvLoaderForTest(t *testing.T) {
+	t.Helper()
+	dotEnvLoadOnce = sync.Once{}
+	dotEnvLoadErr = nil
+	t.Cleanup(func() {
+		dotEnvLoadOnce = sync.Once{}
+		dotEnvLoadErr = nil
+	})
 }

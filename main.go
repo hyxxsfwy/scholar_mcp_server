@@ -45,6 +45,10 @@ func sciHubPDFToMarkdown(ctx context.Context, req *mcp.CallToolRequest, params *
 }
 
 func main() {
+	if err := sourcehandlers.LoadDotEnv(); err != nil {
+		log.Fatalf("Failed to load .env: %v", err)
+	}
+
 	defaultHTTPMode := false
 	defaultPort := "8899"
 	projectConfig, configPath, err := sourcehandlers.LoadProjectConfig()

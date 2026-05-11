@@ -36,6 +36,10 @@ func (sf *SourceFactory) InitializeAllSources() *SourceManager {
 }
 
 func (sf *SourceFactory) loadConfigs() map[string]SourceConfig {
+	if err := LoadDotEnv(); err != nil {
+		log.Printf("[WARN] 读取.env文件失败: %v", err)
+	}
+
 	configs := sf.loadConfigsFromEnv()
 
 	projectConfig, configPath, err := LoadProjectConfig()

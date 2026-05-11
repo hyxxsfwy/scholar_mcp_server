@@ -128,7 +128,7 @@ go run main.go logging.go
 
 ### 配置文件
 
-项目根目录提供 [config.jsonc](config.jsonc)，支持 `//`、`/* ... */` 注释和尾随逗号。程序会先读取环境变量，再用 `config.jsonc` 中实际写出的字段覆盖环境变量；未写出的字段仍会回退到环境变量或内置默认值。
+项目根目录提供 [config.jsonc](config.jsonc)，支持 `//`、`/* ... */` 注释和尾随逗号。程序启动时会自动加载最近的 `.env` 文件到进程环境中，但不会覆盖已有进程环境变量；随后用 `config.jsonc` 中实际写出的字段覆盖环境变量。未写出的字段仍会回退到环境变量或内置默认值。
 
 配置文件包含四类配置：
 
@@ -159,7 +159,8 @@ go run main.go logging.go
     "max_input_chars": 16000,
     "timeout": 60,
     "llm": {
-      "api_key": "your_deepseek_or_openai_compatible_api_key",
+      // 建议把密钥放在 .env 或进程环境变量中，不要提交到 config.jsonc。
+      // "api_key": "your_deepseek_or_openai_compatible_api_key",
       "base_url": "https://api.deepseek.com/v1",
       "model": "deepseek-v4-flash",
       "max_tokens": 1200,
@@ -204,6 +205,12 @@ go run main.go logging.go
 `enrichment.prefetch_pdf` 会优先下载搜索结果中已有的 HTTP(S) `pdf_url`。当 `pdf_fallback` 为 `open_access` 时，如果结果没有 PDF 或下载失败，系统会用 DOI 查询 OpenAlex 的开放获取位置并尝试下载合法 OA PDF；设为 `none` 则只使用结果自带 PDF。该自动链路不会调用 Sci-Hub。启用该功能时，摘要和 PDF 文本节选会发送到你配置的外部 LLM API；如果不希望传输 PDF 内容，可以将 `prefetch_pdf` 设为 `false`，系统仍会基于已有摘要生成大纲/梗概。
 
 兼容的环境变量仍然可用：`REQUEST_TIMEOUT`、`SCOPUS_API_KEY`、`ADSABS_API_KEY`、`OPENALEX_EMAIL`、`CROSSREF_EMAIL`、`SERPAPI_API_KEY`、`GOOGLE_SCHOLAR_API_KEY`、`BROKER_RESEARCH_API_KEY`、`BROKER_RESEARCH_FEEDS`，以及各 `ENABLE_*` 开关。结果增强也支持 `ENABLE_RESULT_ENRICHMENT`、`RESULT_ENRICHMENT_TOP_N`、`RESULT_ENRICHMENT_PREFETCH_PDF`、`RESULT_ENRICHMENT_PDF_FALLBACK`、`RESULT_ENRICHMENT_LLM_API_KEY`、`LLM_API_KEY`、`DEEPSEEK_API_KEY`、`RESULT_ENRICHMENT_LLM_BASE_URL`、`RESULT_ENRICHMENT_LLM_MODEL` 等环境变量。只要同名配置字段写在 [config.jsonc](config.jsonc) 中，配置文件优先。
+
+本地密钥可写入项目根目录 `.env`，该文件已被 `.gitignore` 忽略，不会进入提交。常见写法：
+
+```bash
+RESULT_ENRICHMENT_LLM_API_KEY=your_deepseek_or_openai_compatible_api_key
+```
 
 ### 完整功能运行
 

@@ -4,13 +4,21 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const DefaultProjectConfigFile = "config.jsonc"
+const DefaultDotEnvFile = ".env"
+
+var (
+	dotEnvLoadOnce sync.Once
+	dotEnvLoadErr  error
+)
 
 type ProjectConfig struct {
 	Server     ServerConfig                 `json:"server"`
@@ -125,6 +133,14 @@ func ParseProjectConfigJSONC(content []byte) (*ProjectConfig, error) {
 	return &config, nil
 }
 
+// LoadDotEnv loads the nearest .env file into the process environment without overriding existing variables.
+func LoadDotEnv() error {
+	dotEnvLoadOnce.Do(func() {
+		dotEnvLoadErr = loadDotEnvFromFile(DefaultDotEnvFile)
+	})
+	return dotEnvLoadErr
+}
+
 func (config *ProjectConfig) ApplyToSourceConfigs(configs map[string]SourceConfig) error {
 	if config == nil {
 		return nil
@@ -163,6 +179,10 @@ func (config ServerConfig) PortDefault(defaultValue string) string {
 }
 
 func LoadResultEnrichmentConfig() ResultEnrichmentConfig {
+	if err := LoadDotEnv(); err != nil {
+		log.Printf("[WARN] 读取.env文件失败: %v", err)
+	}
+
 	config := defaultResultEnrichmentConfigFromEnv()
 	projectConfig, _, err := LoadProjectConfig()
 	if err == nil && projectConfig != nil {
@@ -383,6 +403,184 @@ func findProjectConfigFile(fileName string) (string, bool, error) {
 		}
 		currentDir = parent
 	}
+}
+
+func loadDotEnvFromFile(fileName string) error {
+	path, ok, err := findProjectConfigFile(fileName)
+	if err != nil || !ok {
+		return err
+	}
+
+	content, err := os.ReadFile(path)
+	if err != nil {
+		return err
+	}
+
+	values, err := parseDotEnv(content)
+	if err != nil {
+		return fmt.Errorf("解析.env文件 %s 失败: %w", path, err)
+	}
+	for key, value := range values {
+		if _, exists := os.LookupEnv(key); exists {
+			continue
+		}
+		if err := os.Setenv(key, value); err != nil {
+			return fmt.Errorf("设置.env变量 %s 失败: %w", key, err)
+		}
+	}
+
+	return nil
+}
+
+func parseDotEnv(content []byte) (map[string]string, error) {
+	values := make(map[string]string)
+	lines := strings.Split(string(content), "\n")
+	for index, rawLine := range lines {
+		key, value, ok, err := parseDotEnvLine(rawLine)
+		if err != nil {
+			return nil, fmt.Errorf("第%d行: %w", index+1, err)
+		}
+		if ok {
+			values[key] = value
+		}
+	}
+	return values, nil
+}
+
+func parseDotEnvLine(rawLine string) (string, string, bool, error) {
+	line := strings.TrimSpace(rawLine)
+	if line == "" || strings.HasPrefix(line, "#") {
+		return "", "", false, nil
+	}
+	line = trimDotEnvExport(line)
+
+	equalsIndex := strings.Index(line, "=")
+	if equalsIndex <= 0 {
+		return "", "", false, fmt.Errorf("缺少KEY=VALUE格式")
+	}
+
+	key := strings.TrimSpace(line[:equalsIndex])
+	if !isDotEnvKey(key) {
+		return "", "", false, fmt.Errorf("环境变量名无效: %s", key)
+	}
+
+	value, err := parseDotEnvValue(strings.TrimSpace(line[equalsIndex+1:]))
+	if err != nil {
+		return "", "", false, err
+	}
+	return key, value, true, nil
+}
+
+func trimDotEnvExport(line string) string {
+	if !strings.HasPrefix(line, "export") || len(line) == len("export") {
+		return line
+	}
+	if line[len("export")] != ' ' && line[len("export")] != '\t' {
+		return line
+	}
+	return strings.TrimSpace(line[len("export"):])
+}
+
+func parseDotEnvValue(rawValue string) (string, error) {
+	if rawValue == "" {
+		return "", nil
+	}
+	switch rawValue[0] {
+	case '"':
+		return parseDoubleQuotedDotEnvValue(rawValue)
+	case '\'':
+		return parseSingleQuotedDotEnvValue(rawValue)
+	default:
+		return stripDotEnvInlineComment(rawValue), nil
+	}
+}
+
+func parseDoubleQuotedDotEnvValue(rawValue string) (string, error) {
+	closingIndex := closingDotEnvQuoteIndex(rawValue, '"', true)
+	if closingIndex < 0 {
+		return "", fmt.Errorf("双引号未闭合")
+	}
+	if err := validateDotEnvValueTrailing(rawValue[closingIndex+1:]); err != nil {
+		return "", err
+	}
+	value, err := strconv.Unquote(rawValue[:closingIndex+1])
+	if err != nil {
+		return "", err
+	}
+	return value, nil
+}
+
+func parseSingleQuotedDotEnvValue(rawValue string) (string, error) {
+	closingIndex := closingDotEnvQuoteIndex(rawValue, '\'', false)
+	if closingIndex < 0 {
+		return "", fmt.Errorf("单引号未闭合")
+	}
+	if err := validateDotEnvValueTrailing(rawValue[closingIndex+1:]); err != nil {
+		return "", err
+	}
+	return rawValue[1:closingIndex], nil
+}
+
+func closingDotEnvQuoteIndex(rawValue string, quote byte, allowEscapes bool) int {
+	escaped := false
+	for index := 1; index < len(rawValue); index++ {
+		current := rawValue[index]
+		if allowEscapes && escaped {
+			escaped = false
+			continue
+		}
+		if allowEscapes && current == '\\' {
+			escaped = true
+			continue
+		}
+		if current == quote {
+			return index
+		}
+	}
+	return -1
+}
+
+func validateDotEnvValueTrailing(trailing string) error {
+	trimmed := strings.TrimSpace(trailing)
+	if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+		return nil
+	}
+	return fmt.Errorf("引号后存在非注释内容")
+}
+
+func stripDotEnvInlineComment(rawValue string) string {
+	for index := 0; index < len(rawValue); index++ {
+		if rawValue[index] == '#' && (index == 0 || rawValue[index-1] == ' ' || rawValue[index-1] == '\t') {
+			return strings.TrimSpace(rawValue[:index])
+		}
+	}
+	return strings.TrimSpace(rawValue)
+}
+
+func isDotEnvKey(key string) bool {
+	if key == "" {
+		return false
+	}
+	for index, character := range key {
+		if index == 0 {
+			if !isDotEnvKeyStart(character) {
+				return false
+			}
+			continue
+		}
+		if !isDotEnvKeyPart(character) {
+			return false
+		}
+	}
+	return true
+}
+
+func isDotEnvKeyStart(character rune) bool {
+	return character == '_' || character >= 'A' && character <= 'Z' || character >= 'a' && character <= 'z'
+}
+
+func isDotEnvKeyPart(character rune) bool {
+	return isDotEnvKeyStart(character) || character >= '0' && character <= '9'
 }
 
 func jsoncToJSON(content []byte) ([]byte, error) {
