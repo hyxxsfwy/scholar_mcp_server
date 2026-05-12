@@ -28,6 +28,7 @@ func (a *ArxivSource) GetSourceName() string {
 
 // SearchPapers 搜索论文
 func (a *ArxivSource) SearchPapers(ctx context.Context, params common.SearchParams) ([]common.UnifiedPaper, int, error) {
+	params = applySmartArxivCategories(ctx, params)
 	query := params.Query
 	if hasArxivStructuredFilters(params) {
 		query = buildArxivSearchQuery(params)

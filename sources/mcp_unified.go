@@ -224,29 +224,39 @@ func (h *UnifiedMCPHandler) SearchSourcePapers(ctx context.Context, req *mcp.Cal
 	if searchParams.Limit > 100 {
 		searchParams.Limit = 100
 	}
+	requestedOffset := searchParams.Offset
+	requestedLimit := searchParams.Limit
+	plan := buildSemanticSearchPlan(ctx, searchParams)
+	searchCtx := contextWithSemanticSearchPlan(ctx, plan)
+	searchParams = applySemanticSearchPlan(searchParams, plan)
+	sourceSearchParams := searchParams
+	sourceSearchParams.Offset = 0
+	sourceSearchParams.Limit = semanticCandidateLimit(requestedOffset, requestedLimit)
 	if !common.HasSearchTerms(searchParams) {
 		return nil, nil, fmt.Errorf("搜索条件不能为空，至少填写一个搜索词或筛选字段")
 	}
 
 	params.Query = searchParams.Query
-	params.Offset = searchParams.Offset
-	params.Limit = searchParams.Limit
+	params.Offset = requestedOffset
+	params.Limit = requestedLimit
 
 	log.Printf("[INFO] 开始单个数据源搜索: 源='%s', 关键词='%s'", params.Source, searchParams.Query)
 
 	// 执行搜索
 	startTime := time.Now()
-	papers, total, err := source.SearchPapers(ctx, searchParams)
+	papers, total, err := source.SearchPapers(searchCtx, sourceSearchParams)
 	searchTime := time.Since(startTime)
 
 	if err != nil {
 		log.Printf("[ERROR] %s搜索失败: %v", params.Source, err)
 		return nil, nil, fmt.Errorf("%s搜索失败: %w", params.Source, err)
 	}
+	rerankTopSemanticWindow(ctx, papers, plan, semanticRerankWindow)
+	papers = pageSemanticPapers(papers, requestedOffset, requestedLimit)
 	h.enricher.EnrichPapers(ctx, papers)
 
 	// 格式化输出
-	resultText := h.formatSourceSearchResult(params.Source, papers, total, searchTime, params)
+	resultText := h.formatSourceSearchResult(params.Source, papers, total, searchTime, params, plan)
 
 	// 创建结果结构
 	result := map[string]interface{}{
@@ -256,6 +266,7 @@ func (h *UnifiedMCPHandler) SearchSourcePapers(ctx context.Context, req *mcp.Cal
 		"count":       len(papers),
 		"search_time": searchTime.Milliseconds(),
 		"papers":      papers,
+		"search_plan": plan,
 	}
 
 	log.Printf("[INFO] %s搜索完成: %d篇论文, 耗时%v", params.Source, len(papers), searchTime)
@@ -414,6 +425,7 @@ func (h *UnifiedMCPHandler) formatAggregatedSearchResult(result *AggregatedSearc
 	var resultBuilder strings.Builder
 	resultBuilder.WriteString(fmt.Sprintf("🔬 学术论文聚合搜索结果 (关键词: '%s')\n", params.Query))
 	resultBuilder.WriteString(fmt.Sprintf("数据源: %d个总计, %d个活跃\n", result.TotalSources, result.ActiveSources))
+	resultBuilder.WriteString(formatSemanticSearchPlanSection(result.SearchPlan))
 	resultBuilder.WriteString(fmt.Sprintf("搜索耗时: %v\n", result.SearchTime))
 	resultBuilder.WriteString(fmt.Sprintf("显示第%d-%d条结果，共找到约%d篇论文\n\n", params.Offset+1, params.Offset+len(result.Papers), result.TotalResults))
 
@@ -436,9 +448,29 @@ func (h *UnifiedMCPHandler) formatPaperDetail(paper *common.UnifiedPaper) string
 	return resultBuilder.String()
 }
 
-func (h *UnifiedMCPHandler) formatSourceSearchResult(source string, papers []common.UnifiedPaper, total int, searchTime time.Duration, params *SourceSearchParam) string {
+func formatSemanticSearchPlanSection(plan *SemanticSearchPlan) string {
+	if plan == nil || !plan.Applied {
+		return ""
+	}
+
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("语义识别: %s (置信度 %.2f)\n", plan.ContextLabel, plan.Confidence))
+	if strings.TrimSpace(plan.SearchQuery) != "" {
+		builder.WriteString(fmt.Sprintf("检索关键词: %s\n", plan.SearchQuery))
+	}
+	if len(plan.ArxivCategories) > 0 {
+		builder.WriteString(fmt.Sprintf("arXiv分类过滤: %s\n", strings.Join(plan.ArxivCategories, ", ")))
+	}
+	if len(plan.Notes) > 0 {
+		builder.WriteString(fmt.Sprintf("说明: %s\n", strings.Join(plan.Notes, "；")))
+	}
+	return builder.String()
+}
+
+func (h *UnifiedMCPHandler) formatSourceSearchResult(source string, papers []common.UnifiedPaper, total int, searchTime time.Duration, params *SourceSearchParam, plan *SemanticSearchPlan) string {
 	var resultBuilder strings.Builder
 	resultBuilder.WriteString(fmt.Sprintf("📚 %s 搜索结果 (关键词: '%s')\n", source, params.Query))
+	resultBuilder.WriteString(formatSemanticSearchPlanSection(plan))
 	resultBuilder.WriteString(fmt.Sprintf("搜索耗时: %v\n", searchTime))
 	resultBuilder.WriteString(fmt.Sprintf("显示第%d-%d条结果，共找到约%d篇论文\n\n", params.Offset+1, params.Offset+len(papers), total))
 

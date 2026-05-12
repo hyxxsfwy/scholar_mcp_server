@@ -384,12 +384,16 @@ func newOpenAICompatibleLLMClient(config LLMConfig, httpClient *http.Client) *op
 }
 
 func (client *openAICompatibleLLMClient) Generate(ctx context.Context, prompt string) (string, error) {
+	return client.GenerateWithSystem(ctx, "你是严谨的学术研究助理，擅长从论文摘要和PDF节选中提炼结构化中文文献大纲。", prompt)
+}
+
+func (client *openAICompatibleLLMClient) GenerateWithSystem(ctx context.Context, systemPrompt string, prompt string) (string, error) {
 	requestBody := openAIChatCompletionRequest{
 		Model:       client.config.Model,
 		MaxTokens:   client.config.MaxTokens,
 		Temperature: client.config.Temperature,
 		Messages: []openAIChatMessage{
-			{Role: "system", Content: "你是严谨的学术研究助理，擅长从论文摘要和PDF节选中提炼结构化中文文献大纲。"},
+			{Role: "system", Content: systemPrompt},
 			{Role: "user", Content: prompt},
 		},
 	}

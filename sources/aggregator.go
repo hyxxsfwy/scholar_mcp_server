@@ -42,6 +42,7 @@ type AggregatedSearchResult struct {
 	SourceResults map[string]interface{} `json:"source_results"`
 	SourceStatus  []common.ServiceStatus `json:"source_status"`
 	Suggestions   []common.SearchHint    `json:"suggestions"`
+	SearchPlan    *SemanticSearchPlan    `json:"search_plan,omitempty"`
 }
 
 // SearchPapers 聚合搜索论文
@@ -55,8 +56,15 @@ func (a *ScholarAggregator) SearchPapers(ctx context.Context, params common.Sear
 
 	// 标准化参数
 	common.NormalizeSearchParams(&params)
+	requestedOffset := params.Offset
+	requestedLimit := params.Limit
+	plan := buildSemanticSearchPlan(ctx, params)
+	searchCtx := contextWithSemanticSearchPlan(ctx, plan)
+	searchParams := applySemanticSearchPlan(params, plan)
+	searchParams.Offset = 0
+	searchParams.Limit = semanticCandidateLimit(requestedOffset, requestedLimit)
 
-	log.Printf("[INFO] 开始聚合搜索: 关键词='%s', 限制=%d", params.Query, params.Limit)
+	log.Printf("[INFO] 开始聚合搜索: 关键词='%s', 限制=%d", searchParams.Query, searchParams.Limit)
 
 	// 创建并发搜索通道
 	type sourceResult struct {
@@ -81,7 +89,7 @@ func (a *ScholarAggregator) SearchPapers(ctx context.Context, params common.Sear
 		go func(name string, src PaperSource) {
 			defer wg.Done()
 			start := time.Now()
-			papers, total, err := src.SearchPapers(ctx, params)
+			papers, total, err := src.SearchPapers(searchCtx, searchParams)
 			resultChan <- sourceResult{
 				source:  name,
 				papers:  papers,
@@ -137,28 +145,21 @@ func (a *ScholarAggregator) SearchPapers(ctx context.Context, params common.Sear
 	mergedPapers := a.mergePapers(allPapers)
 
 	// 排序
-	a.sortPapers(mergedPapers, params.SortBy, params.SortOrder)
+	a.sortPapers(mergedPapers, params.SortBy, params.SortOrder, plan)
+	rerankTopSemanticWindow(ctx, mergedPapers, plan, semanticRerankWindow)
 
 	// 应用分页
-	if params.Offset >= len(mergedPapers) {
-		mergedPapers = []common.UnifiedPaper{}
-	} else {
-		end := params.Offset + params.Limit
-		if end > len(mergedPapers) {
-			end = len(mergedPapers)
-		}
-		mergedPapers = mergedPapers[params.Offset:end]
-	}
+	mergedPapers = pageSemanticPapers(mergedPapers, requestedOffset, requestedLimit)
 
 	// 生成搜索建议
-	suggestions := common.GenerateSearchSuggestions(params.Query)
+	suggestions := append(semanticSearchHints(plan), common.GenerateSearchSuggestions(params.Query)...)
 
 	searchTime := time.Since(startTime)
 	log.Printf("[INFO] 聚合搜索完成: %d个数据源, %d个活跃, %d篇论文, 耗时%v",
 		totalSources, activeSources, len(mergedPapers), searchTime)
 
 	return &AggregatedSearchResult{
-		Query:         params.Query,
+		Query:         searchParams.Query,
 		TotalSources:  totalSources,
 		ActiveSources: activeSources,
 		TotalResults:  totalResults,
@@ -167,6 +168,7 @@ func (a *ScholarAggregator) SearchPapers(ctx context.Context, params common.Sear
 		SourceResults: sourceResults,
 		SourceStatus:  sourceStatus,
 		Suggestions:   suggestions,
+		SearchPlan:    plan,
 	}, nil
 }
 
@@ -296,7 +298,7 @@ func (a *ScholarAggregator) generatePaperKey(paper common.UnifiedPaper) string {
 }
 
 // sortPapers 排序论文
-func (a *ScholarAggregator) sortPapers(papers []common.UnifiedPaper, sortBy, sortOrder string) {
+func (a *ScholarAggregator) sortPapers(papers []common.UnifiedPaper, sortBy, sortOrder string, plan *SemanticSearchPlan) {
 	sort.Slice(papers, func(i, j int) bool {
 		var less bool
 		switch sortBy {
@@ -307,15 +309,8 @@ func (a *ScholarAggregator) sortPapers(papers []common.UnifiedPaper, sortBy, sor
 		case "title":
 			less = papers[i].Title < papers[j].Title
 		default: // relevance
-			// 简单的相关性评分：引用数 + 开放获取奖励
-			scoreI := papers[i].CitationCount
-			scoreJ := papers[j].CitationCount
-			if papers[i].IsOpenAccess {
-				scoreI += 10
-			}
-			if papers[j].IsOpenAccess {
-				scoreJ += 10
-			}
+			scoreI := semanticPaperScore(papers[i], plan)
+			scoreJ := semanticPaperScore(papers[j], plan)
 			less = scoreI < scoreJ
 		}
 
